@@ -1,0 +1,70 @@
+version: "3.9"
+
+# ─────────────────────────────────────────────
+#  docker-compose.prod.yml  →  PRODUCCIÓN
+#  Levanta: Django (gunicorn) + Nginx
+#  El frontend ya fue buildeado: npm run build
+#  El PostgreSQL vive en una red Docker externa
+#
+#  Uso:
+#    cd frontend && npm run build && cd ..
+#    docker compose -f docker-compose.prod.yml up --build -d
+# ─────────────────────────────────────────────
+
+services:
+
+  # ── Django backend (gunicorn) ───────────────
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    command: >
+      sh -c "python manage.py migrate --noinput &&
+             python manage.py collectstatic --noinput &&
+             gunicorn mentor_virtual.wsgi:application
+               --bind 0.0.0.0:8000
+               --workers 3
+               --timeout 120
+               --access-logfile -"
+    volumes:
+      - static_files:/app/staticfiles
+    env_file: .env
+    environment:
+      DEBUG: "False"
+    networks:
+      - mentor_net
+      - db_net           # red donde vive el Postgres existente
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8000/api/auth/login/ || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # ── Nginx: sirve React build + reverse proxy ─
+  nginx:
+    build:
+      context: ./nginx
+      dockerfile: Dockerfile
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - static_files:/app/staticfiles:ro
+      - ./frontend/dist:/usr/share/nginx/html:ro
+      - ./nginx/certs:/etc/nginx/certs:ro    # tus certificados SSL
+    depends_on:
+      - backend
+    networks:
+      - mentor_net
+    restart: unless-stopped
+
+volumes:
+  static_files:
+
+networks:
+  mentor_net:
+    driver: bridge
+  db_net:
+    external: true
+    name: ${DOCKER_NETWORK:-app_network}    # red donde vive el Postgres
