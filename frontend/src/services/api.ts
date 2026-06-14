@@ -40,6 +40,12 @@ export const apiCreateGoal = (goal_text: string) =>
 export const apiGetGoal = (id: number) =>
   fetch(`${BASE}/goals/${id}/`, { headers: headers() }).then(r => r.json())
 
+export const apiDeleteGoal = (id: number) =>
+  fetch(`${BASE}/goals/${id}/delete/`, {
+    method: 'DELETE',
+    headers: headers(),
+  }).then(r => r.json())
+
 // ── Progress ──────────────────────────────────────────────────────────────────
 export const apiCompleteStep = (stepId: number, goalId: number) =>
   fetch(`${BASE}/progress/steps/${stepId}/complete/`, {

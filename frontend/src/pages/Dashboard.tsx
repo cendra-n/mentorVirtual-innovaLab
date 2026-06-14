@@ -10,7 +10,7 @@ import AdminPanel from './AdminPanel'
 import Profile from './Profile'
 import TutorPage from './TutorPage'
 import {
-  apiMe, apiGetGoals, apiCreateGoal, apiStreak
+  apiMe, apiGetGoals, apiCreateGoal, apiStreak, apiDeleteGoal
 } from '../services/api'
 
 interface Props { onLogout: () => void }
@@ -43,14 +43,20 @@ export default function Dashboard({ onLogout }: Props) {
       if (res.goal) {
         await loadData()
         setShowModal(false)
-        // Navegar directo al detalle del plan recién creado
         setSelectedGoal(res.goal.id)
       }
     } catch {
-      // silenciar — el modal muestra error
     }
     setGoalLoading(false)
   }
+
+  const handleDeleteGoal = async (id: number) => {
+    await apiDeleteGoal(id)
+    await loadData()
+  }
+
+  const userRole = user?.role || 'STUDENT'
+  const canDelete = userRole === 'ADMIN' || userRole === 'PROFESSOR' || user?.is_staff
 
   const displayName = user?.first_name || user?.username || '...'
 
@@ -146,7 +152,13 @@ export default function Dashboard({ onLogout }: Props) {
             </div>
             <div className="goals-list">
               {goals.slice(0, 3).map(g => (
-                <GoalCard key={g.id} goal={g} onClick={setSelectedGoal} />
+                <GoalCard
+                  key={g.id}
+                  goal={g}
+                  onClick={setSelectedGoal}
+                  onDelete={handleDeleteGoal}
+                  canDelete={canDelete}
+                />
               ))}
             </div>
           </section>

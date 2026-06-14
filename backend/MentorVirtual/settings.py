@@ -13,6 +13,9 @@ import os
 from pathlib import Path
 from datetime import timedelta
 
+ANTHROPIC_API_KEY = os.environ.get('ANTHROPIC_API_KEY', '')
+YOUTUBE_API_KEY   = os.environ.get('YOUTUBE_API_KEY', '')
+
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -138,12 +141,10 @@ STATIC_URL = 'static/'
 
 # Configuración de Django REST Framework
 # Se definen las clases de autenticación y el esquema de generación de OpenAPI por defecto
+
 REST_FRAMEWORK = {
-    
-   'DEFAULT_AUTHENTICATION_CLASSES': (
-        'rest_framework_simplejwt.authentication.JWTAuthentication', # <--- Activamos JWT
-        'rest_framework.authentication.SessionAuthentication',
-        
+    'DEFAULT_AUTHENTICATION_CLASSES': (
+        'rest_framework_simplejwt.authentication.JWTAuthentication',
     ),
     'DEFAULT_PERMISSION_CLASSES': (
         'rest_framework.permissions.IsAuthenticated',
@@ -194,6 +195,16 @@ SPECTACULAR_SETTINGS = {
     }
 }
 
-AUTH_USER_MODEL = 'users.UserProfile'
+CSRF_TRUSTED_ORIGINS = [
+    'http://172.29.215.177:5173',
+    'http://172.29.215.177:8000',
+    'http://localhost:5173',
+]
 
 
+
+
+# APIs externas
+ANTHROPIC_API_KEY = os.environ.get('ANTHROPIC_API_KEY', '')
+YOUTUBE_API_KEY   = os.environ.get('YOUTUBE_API_KEY', '')
+FRONTEND_URL      = os.environ.get('FRONTEND_URL', 'http://localhost:5173')

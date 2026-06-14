@@ -19,7 +19,7 @@ def _tokens_for_user(user):
 class RegisterView(APIView):
     permission_classes = [AllowAny]
 
-    @extend_schema(
+    @extend_schema(tags=['auth'], 
         summary="Registrar nuevo usuario",
         request=inline_serializer('RegisterRequest', fields={
             'username': serializers.CharField(),
@@ -77,7 +77,7 @@ class RegisterView(APIView):
 class LoginView(APIView):
     permission_classes = [AllowAny]
 
-    @extend_schema(
+    @extend_schema(tags=['auth'], 
         summary="Login — obtener tokens JWT",
         request=inline_serializer('LoginRequest', fields={
             'username': serializers.CharField(),
@@ -110,7 +110,7 @@ class LoginView(APIView):
 class LogoutView(APIView):
     permission_classes = [IsAuthenticated]
 
-    @extend_schema(
+    @extend_schema(tags=['auth'], 
         summary="Logout — invalidar refresh token",
         request=inline_serializer('LogoutRequest', fields={
             'refresh': serializers.CharField(),
@@ -134,7 +134,7 @@ class LogoutView(APIView):
 class ChangePasswordView(APIView):
     permission_classes = [IsAuthenticated]
 
-    @extend_schema(
+    @extend_schema(tags=['auth'], 
         summary="Cambiar contraseña del usuario autenticado",
         request=inline_serializer('ChangePasswordRequest', fields={
             'current_password':  serializers.CharField(),
@@ -170,7 +170,7 @@ class ChangePasswordView(APIView):
 class MeView(APIView):
     permission_classes = [IsAuthenticated]
 
-    @extend_schema(summary="Datos del usuario autenticado")
+    @extend_schema(tags=['auth'], summary="Datos del usuario autenticado")
     def get(self, request):
         u = request.user
         return Response({

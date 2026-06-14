@@ -25,7 +25,7 @@ from .pdf_processor import extract_chunks
 from .embeddings import embed_text, embed_batch
 from .db import (
     sp_create_book, sp_save_chunk, sp_get_books,
-    sp_delete_book
+    sp_delete_book, sp_search_chunks
 )
 
 logger = logging.getLogger(__name__)
@@ -118,9 +118,19 @@ class BookDetailView(APIView):
     permission_classes = [IsAuthenticated]
 
     def delete(self, request, book_id):
-        deleted = sp_delete_book(book_id, request.user.id)
+        user    = request.user
+        role    = getattr(getattr(user, 'profile', None), 'role', 'STUDENT')
+        is_prof = role in ['ADMIN', 'PROFESSOR'] or user.is_staff
+
+        with connection.cursor() as cur:
+            if is_prof:
+                cur.execute("DELETE FROM tutor_books WHERE id = %s", [book_id])
+            else:
+                cur.execute("DELETE FROM tutor_books WHERE id = %s AND user_id = %s", [book_id, user.id])
+            deleted = cur.rowcount
+
         if not deleted:
-            return Response({'error': 'Libro no encontrado.'}, status=404)
+            return Response({'error': 'Libro no encontrado o sin permiso.'}, status=404)
         return Response({'message': 'Libro eliminado correctamente.'})
 
 
@@ -140,12 +150,11 @@ class AskStepView(APIView):
         if not question:
             return Response({'error': 'La pregunta es obligatoria.'}, status=400)
 
-
+        user_id = request.user.id
 
         # Contexto del paso para enriquecer la búsqueda
         search_query = f"{step_title} {question}"
         query_embedding = embed_text(search_query)
-        user_id = request.user.id
 
         # Buscar en TODOS los libros del usuario
         source_label = None
@@ -224,31 +233,16 @@ Respondé SOLO sobre este tema específico. Si no tenés certeza, decí "No teng
         })
     permission_classes = [IsAuthenticated]
 
-    def post(self, request):
+    def post(self, request, book_id):
         question = request.data.get('question', '').strip()
         if not question:
             return Response({'error': 'La pregunta es obligatoria.'}, status=400)
 
         # Embedding de la pregunta
-        user_id = request.user.id
         query_embedding = embed_text(question)
 
-        # Buscar en todos los libros del usuario
-        with connection.cursor() as cur:
-            cur.execute(
-                """
-                SELECT tc.content, tc.page_num, tb.title,
-                       1 - (tc.embedding <=> %s::vector) AS similarity
-                FROM tutor_chunks tc
-                JOIN tutor_books tb ON tb.id = tc.book_id
-                WHERE tb.user_id = %s
-                ORDER BY tc.embedding <=> %s::vector
-                LIMIT 2
-                """,
-                [str(query_embedding), user_id, str(query_embedding)]
-            )
-            rows = cur.fetchall()
-        chunks = [{"content": r[0], "page_num": r[1], "title": r[2], "similarity": r[3]} for r in rows]
+        # Buscar los 2 chunks más relevantes
+        chunks = sp_search_chunks(book_id, query_embedding, limit=2)
         if not chunks:
             return Response({'error': 'No se encontraron fragmentos relevantes.'}, status=404)
 

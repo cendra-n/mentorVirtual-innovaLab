@@ -1,4 +1,5 @@
 import logging
+from django.db import connection
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
@@ -93,3 +94,28 @@ class GoalDetailView(APIView):
         if not goal:
             return Response({'error': 'Meta no encontrada.'}, status=status.HTTP_404_NOT_FOUND)
         return Response(_build_full_plan(goal, request.user.id))
+
+
+class GoalDeleteView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    @extend_schema(
+        tags=['goals'],
+        summary="Eliminar una meta",
+        description="El usuario puede borrar sus propias metas. Profesores y admins pueden borrar cualquier meta.",
+    )
+    def delete(self, request, goal_id: int):
+        user    = request.user
+        role    = getattr(getattr(user, 'profile', None), 'role', 'STUDENT')
+        is_prof = role in ['ADMIN', 'PROFESSOR'] or user.is_staff
+
+        with connection.cursor() as cur:
+            if is_prof:
+                cur.execute("DELETE FROM goals WHERE id = %s", [goal_id])
+            else:
+                cur.execute("DELETE FROM goals WHERE id = %s AND user_id = %s", [goal_id, user.id])
+            deleted = cur.rowcount
+
+        if not deleted:
+            return Response({'error': 'Meta no encontrada o sin permiso.'}, status=404)
+        return Response({'message': 'Meta eliminada correctamente.'})
