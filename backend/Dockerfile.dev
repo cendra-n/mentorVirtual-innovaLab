@@ -1,4 +1,4 @@
-# ── Producción ────────────────────────────────
+# ── Desarrollo (igual pero con hot-reload vía runserver) ──
 FROM python:3.12-slim
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
@@ -13,6 +13,5 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY . .
-
+# No copiamos el código: en dev se monta como volumen
 EXPOSE 8000

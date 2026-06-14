@@ -152,3 +152,4 @@ __pycache__/
 #Sqlite
 *.sqlite3
 db.sqlite3
+setup_maqueta.sh
