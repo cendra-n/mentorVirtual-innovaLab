@@ -32,7 +32,7 @@ MIDDLEWARE = [
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
 
-ROOT_URLCONF = 'mentor_virtual.urls'
+ROOT_URLCONF = 'MentorVirtual.urls'
 
 TEMPLATES = [
     {
@@ -50,12 +50,12 @@ TEMPLATES = [
     },
 ]
 
-WSGI_APPLICATION = 'mentor_virtual.wsgi.application'
+WSGI_APPLICATION = 'MentorVirtual.wsgi.application'
 
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql',
-        'NAME': os.environ.get('POSTGRES_DB', 'mentor_virtual'),
+        'NAME': os.environ.get('POSTGRES_DB', 'MentorVirtual'),
         'USER': os.environ.get('POSTGRES_USER', 'postgres'),
         'PASSWORD': os.environ.get('POSTGRES_PASSWORD', 'postgres'),
         'HOST': os.environ.get('POSTGRES_HOST', 'db'),

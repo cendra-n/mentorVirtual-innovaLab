@@ -45,7 +45,7 @@ El **Mentor Virtual Adaptativo** ayuda a adultos que dejaron sus estudios a reto
 ### 1. Clonar y configurar
 ```bash
 git clone <repo>
-cd mentor_virtual
+cd MentorVirtual
 cp .env.example .env
 # Editá .env con tus claves reales
 ```
@@ -68,7 +68,7 @@ Levanta tres servicios:
 ### 4. Inicializar la base de datos
 ```bash
 # Tablas propias + stored procedures
-docker exec -i mentor-postgres-1 psql -U postgres -d mentor_virtual < backend/init.sql
+docker exec -i mentor-postgres-1 psql -U postgres -d MentorVirtual < backend/init.sql
 
 # Tablas de Django (auth, sessions, etc.)
 docker compose exec backend python manage.py migrate
@@ -91,9 +91,9 @@ docker compose exec backend python manage.py createsuperuser
 ## 📁 Estructura del Proyecto
 
 ```
-mentor_virtual/
+MentorVirtual/
 ├── backend/
-│   ├── mentor_virtual/     ← configuración global (settings, urls, wsgi)
+│   ├── MentorVirtual/     ← configuración global (settings, urls, wsgi)
 │   ├── users/              ← registro, login, JWT, cambio de contraseña
 │   ├── goals/              ← metas, planes IA, videos YouTube
 │   ├── progress/           ← pasos completados, logros, streaks
@@ -238,7 +238,7 @@ DEBUG=True
 ALLOWED_HOSTS=localhost,127.0.0.1,TU_IP
 
 # PostgreSQL
-POSTGRES_DB=mentor_virtual
+POSTGRES_DB=MentorVirtual
 POSTGRES_USER=postgres
 POSTGRES_PASSWORD=postgres
 POSTGRES_HOST=postgres
