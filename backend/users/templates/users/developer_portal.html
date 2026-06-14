@@ -1,0 +1,549 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Portal de Desarrolladores - Mentor Virtual</title>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&family=Plus+Jakarta+Sans:wght@300;400;600;700&display=swap" rel="stylesheet">
+    
+    <!-- Cargamos la librería de spline-viewer de forma local -->
+    <script type="module" src="{% static 'users/js/spline-viewer.js' %}"></script>
+    
+    <style>
+        :root {
+            --bg-primary: #f4f8fc;
+            --bg-secondary: #ffffff;
+            --glass-bg: rgba(255, 255, 255, 0.85);
+            --glass-border: rgba(0, 115, 230, 0.12);
+            --color-primary: #0073e6;       /* Cobalto brillante */
+            --color-secondary: #2572ca;     /* Azul secundario */
+            --color-accent: #003c80;        /* Navy profundo */
+            --text-main: #0c2340;           /* Navy oscuro */
+            --text-muted: #4a5568;          /* Gris slate */
+            --font-family: 'Plus Jakarta Sans', sans-serif;
+            --font-title: 'Outfit', sans-serif;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            background-color: var(--bg-primary);
+            background-image: 
+                radial-gradient(at 10% 10%, rgba(0, 115, 230, 0.06) 0px, transparent 40%),
+                radial-gradient(at 90% 80%, rgba(37, 114, 202, 0.05) 0px, transparent 45%),
+                radial-gradient(at 50% 50%, rgba(0, 60, 128, 0.02) 0px, transparent 50%);
+            background-attachment: fixed;
+            color: var(--text-main);
+            font-family: var(--font-family);
+            min-height: 100vh;
+            padding: 7rem 1.5rem 2rem 1.5rem; /* Margen superior para compensar el Navbar */
+            line-height: 1.6;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            overflow-x: hidden;
+        }
+
+        /* Navigation Bar Styles */
+        .navbar {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 70px;
+            background: rgba(255, 255, 255, 0.85);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border-bottom: 1px solid rgba(0, 115, 230, 0.08);
+            z-index: 1000;
+            display: flex;
+            align-items: center;
+            box-shadow: 0 4px 20px rgba(0, 115, 230, 0.02);
+        }
+
+        .nav-container {
+            max-width: 1200px;
+            width: 100%;
+            margin: 0 auto;
+            padding: 0 1.5rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .nav-brand {
+            display: flex;
+            align-items: center;
+            gap: 0.8rem;
+            text-decoration: none;
+            color: var(--color-accent);
+            font-family: var(--font-title);
+            font-weight: 800;
+            font-size: 1.3rem;
+            letter-spacing: -0.03em;
+        }
+
+        .nav-pulse {
+            width: 8px;
+            height: 8px;
+            background-color: var(--color-primary);
+            border-radius: 50%;
+            box-shadow: 0 0 8px var(--color-primary);
+            animation: pulse 2s infinite;
+        }
+
+        .nav-links {
+            display: flex;
+            align-items: center;
+            gap: 2rem;
+        }
+
+        .nav-link {
+            text-decoration: none;
+            color: var(--text-muted);
+            font-size: 0.95rem;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            position: relative;
+        }
+
+        .nav-link:hover {
+            color: var(--color-primary);
+        }
+
+        .nav-link.active {
+            color: var(--color-primary);
+        }
+
+        .nav-link.active::after {
+            content: '';
+            position: absolute;
+            bottom: -6px;
+            left: 0;
+            width: 100%;
+            height: 2px;
+            background-color: var(--color-primary);
+            border-radius: 2px;
+        }
+
+        .nav-btn {
+            background-color: var(--color-primary);
+            color: #ffffff !important;
+            padding: 0.5rem 1.2rem;
+            border-radius: 10px;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 10px rgba(0, 115, 230, 0.15);
+        }
+
+        .nav-btn:hover {
+            background-color: var(--color-secondary);
+            transform: translateY(-2px);
+            box-shadow: 0 6px 14px rgba(0, 115, 230, 0.25);
+        }
+
+        /* Decorative Blob/Wave matching the image styling */
+        .decor-wave-1 {
+            position: fixed;
+            bottom: -150px;
+            left: -150px;
+            width: 600px;
+            height: 600px;
+            background: linear-gradient(135deg, rgba(0, 115, 230, 0.14) 0%, rgba(37, 114, 202, 0.04) 100%);
+            border-radius: 43% 57% 41% 59% / 57% 45% 55% 43%;
+            z-index: -2;
+            filter: blur(15px);
+            animation: waveFloat 20s infinite alternate ease-in-out;
+            pointer-events: none;
+        }
+
+        .decor-wave-2 {
+            position: fixed;
+            bottom: -200px;
+            left: -200px;
+            width: 500px;
+            height: 500px;
+            background: linear-gradient(135deg, rgba(0, 115, 230, 0.08) 0%, rgba(255, 255, 255, 0) 100%);
+            border-radius: 50% 40% 60% 40% / 40% 60% 40% 60%;
+            z-index: -3;
+            animation: waveFloat 14s infinite alternate-reverse ease-in-out;
+            pointer-events: none;
+        }
+
+        /* Dot Grid matching the bottom left of the image */
+        body::before {
+            content: '';
+            position: fixed;
+            bottom: 2.5rem;
+            left: 2.5rem;
+            width: 120px;
+            height: 120px;
+            background-image: radial-gradient(rgba(0, 115, 230, 0.25) 1.5px, transparent 1.5px);
+            background-size: 10px 10px;
+            z-index: -1;
+            opacity: 0.8;
+            pointer-events: none;
+        }
+
+        /* Top-left dots from the image */
+        body::after {
+            content: '';
+            position: absolute;
+            top: 6.5rem;
+            left: 2.5rem;
+            width: 60px;
+            height: 20px;
+            background-image: radial-gradient(var(--color-primary) 3px, transparent 3px);
+            background-size: 14px 14px;
+            z-index: -1;
+            opacity: 0.35;
+            pointer-events: none;
+        }
+
+        /* Layout Grid for Left and Right distribution */
+        .portal-layout {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            max-width: 1200px;
+            width: 100%;
+            margin: 0 auto;
+            gap: 4rem;
+            z-index: 2;
+        }
+
+        .portal-main {
+            flex: 1.2;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Header Styles */
+        header {
+            text-align: left;
+            margin-bottom: 3rem;
+            animation: fadeInDown 0.8s ease;
+        }
+
+        .logo-area {
+            display: inline-flex;
+            align-items: center;
+            gap: 1rem;
+            margin-bottom: 0.8rem;
+        }
+
+        .pulse-dot {
+            width: 12px;
+            height: 12px;
+            background-color: var(--color-primary);
+            border-radius: 50%;
+            box-shadow: 0 0 12px var(--color-primary);
+            animation: pulse 2s infinite;
+        }
+
+        h1 {
+            font-family: var(--font-title);
+            font-weight: 800;
+            font-size: 3.2rem;
+            background: linear-gradient(135deg, var(--color-accent) 40%, var(--color-primary) 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            letter-spacing: -0.04em;
+        }
+
+        header .subtitle {
+            color: var(--color-secondary);
+            font-size: 1.35rem;
+            font-weight: 600;
+            margin-top: 0.5rem;
+            letter-spacing: -0.02em;
+        }
+
+        /* Hub Cards Grid */
+        .cards-grid {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 1.5rem;
+            animation: fadeInUp 0.8s ease;
+        }
+
+        .card {
+            background: var(--glass-bg);
+            border: 1px solid var(--glass-border);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border-radius: 24px;
+            padding: 2rem;
+            text-decoration: none;
+            color: var(--text-main);
+            transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+            position: relative;
+            overflow: hidden;
+            display: flex;
+            align-items: center;
+            gap: 1.5rem;
+            box-shadow: 0 10px 30px -10px rgba(0, 115, 230, 0.04);
+        }
+
+        .card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(135deg, rgba(0, 115, 230, 0.03) 0%, transparent 100%);
+            opacity: 0;
+            transition: opacity 0.4s ease;
+        }
+
+        .card:hover {
+            transform: translateY(-4px);
+            border-color: rgba(0, 115, 230, 0.35);
+            box-shadow: 0 20px 45px -12px rgba(0, 115, 230, 0.1);
+        }
+
+        .card:hover::before {
+            opacity: 1;
+        }
+
+        .card-icon {
+            width: 48px;
+            height: 48px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+            font-weight: bold;
+            box-shadow: inset 0 2px 4px rgba(255, 255, 255, 0.5);
+            flex-shrink: 0;
+        }
+
+        .icon-swagger {
+            background: linear-gradient(135deg, rgba(0, 115, 230, 0.08) 0%, rgba(37, 114, 202, 0.15) 100%);
+            color: var(--color-primary);
+            border: 1px solid rgba(0, 115, 230, 0.2);
+        }
+
+        .icon-redoc {
+            background: linear-gradient(135deg, rgba(0, 60, 128, 0.06) 0%, rgba(0, 115, 230, 0.12) 100%);
+            color: var(--color-accent);
+            border: 1px solid rgba(0, 60, 128, 0.15);
+        }
+
+        .icon-admin {
+            background: linear-gradient(135deg, rgba(0, 115, 230, 0.05) 0%, rgba(0, 60, 128, 0.08) 100%);
+            color: #0369a1;
+            border: 1px solid rgba(3, 105, 161, 0.15);
+        }
+
+        .card-text-wrapper {
+            flex: 1;
+        }
+
+        .card h2 {
+            font-family: var(--font-title);
+            font-size: 1.35rem;
+            font-weight: 700;
+            margin-bottom: 0.3rem;
+            letter-spacing: -0.02em;
+            color: var(--color-accent);
+        }
+
+        .card p {
+            color: var(--text-muted);
+            font-size: 0.9rem;
+            line-height: 1.4;
+        }
+
+        .card-action {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--color-primary);
+            transition: transform 0.2s ease;
+        }
+
+        .card:hover .card-action {
+            transform: translateX(4px);
+            color: var(--color-secondary);
+        }
+
+        .card-action svg {
+            width: 20px;
+            height: 20px;
+            fill: none;
+            stroke: currentColor;
+            stroke-width: 2;
+        }
+
+        /* Sidebar/Aside Column for 3D Spline Animation */
+        .portal-aside {
+            flex: 1;
+            max-width: 480px;
+            height: 520px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            animation: fadeInRight 1s cubic-bezier(0.16, 1, 0.3, 1) ease;
+        }
+
+        .animation-container {
+            width: 100%;
+            height: 100%;
+            border-radius: 28px;
+            overflow: hidden;
+            box-shadow: 0 20px 50px rgba(0, 115, 230, 0.06);
+            border: 1px solid rgba(0, 115, 230, 0.15);
+            background: #ffffff;
+            position: relative;
+        }
+
+        .animation-container spline-viewer {
+            width: 100%;
+            height: 100%;
+            display: block;
+        }
+
+        /* Animations */
+        @keyframes pulse {
+            0% { transform: scale(0.9); box-shadow: 0 0 0 0 rgba(0, 115, 230, 0.6); }
+            70% { transform: scale(1); box-shadow: 0 0 0 10px rgba(0, 115, 230, 0); }
+            100% { transform: scale(0.9); box-shadow: 0 0 0 0 rgba(0, 115, 230, 0); }
+        }
+
+        @keyframes waveFloat {
+            0% { transform: rotate(0deg) translate(0, 0); }
+            100% { transform: rotate(30deg) translate(30px, 20px); }
+        }
+
+        @keyframes fadeInDown {
+            from { opacity: 0; transform: translateY(-20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        @keyframes fadeInUp {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        @keyframes fadeInRight {
+            from { opacity: 0; transform: translateX(40px); }
+            to { opacity: 1; transform: translateX(0); }
+        }
+
+        /* Responsive Layout Settings */
+        @media (max-width: 992px) {
+            body {
+                padding-top: 6rem;
+            }
+            .portal-layout {
+                flex-direction: column;
+                gap: 3rem;
+            }
+            .portal-main {
+                width: 100%;
+                max-width: 100%;
+            }
+            .portal-aside {
+                width: 100%;
+                max-width: 100%;
+                height: 400px;
+            }
+            header {
+                text-align: center;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Navigation Bar -->
+    <nav class="navbar">
+        <div class="nav-container">
+            <a href="/api/docs/" class="nav-brand">
+                <span class="nav-pulse"></span>
+                <span>Mentor Virtual</span>
+            </a>
+            <div class="nav-links">
+                <a href="/api/docs/" class="nav-link active">Inicio</a>
+                <a href="/api/schema/swagger-ui/" target="_blank" class="nav-link">Swagger Sandbox</a>
+                <a href="/api/schema/redoc/" target="_blank" class="nav-link">ReDoc Spec</a>
+                <a href="/admin/" target="_blank" class="nav-link nav-btn">Panel Admin</a>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Organic background shapes -->
+    <div class="decor-wave-1"></div>
+    <div class="decor-wave-2"></div>
+
+    <div class="container">
+        <div class="portal-layout">
+            
+            <!-- Left Side: Main documentation links -->
+            <div class="portal-main">
+                <header>
+                    <div class="logo-area">
+                        <span class="pulse-dot"></span>
+                        <h1>Mentor Virtual.</h1>
+                    </div>
+                    <p class="subtitle">Transformando el Aprendizaje con Acompañamiento real.</p>
+                </header>
+
+                <section class="cards-grid">
+                    <!-- Swagger UI Card -->
+                    <a href="/api/schema/swagger-ui/" target="_blank" class="card">
+                        <div class="card-icon icon-swagger">▶</div>
+                        <div class="card-text-wrapper">
+                            <h2>Swagger UI Sandbox</h2>
+                            <p>Consola interactiva en tiempo real. Prueba endpoints de la API, envía cabeceras de tokens seguros y valida respuestas.</p>
+                        </div>
+                        <div class="card-action">
+                            <svg viewBox="0 0 24 24"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+                        </div>
+                    </a>
+
+                    <!-- ReDoc Card -->
+                    <a href="/api/schema/redoc/" target="_blank" class="card">
+                        <div class="card-icon icon-redoc">📖</div>
+                        <div class="card-text-wrapper">
+                            <h2>ReDoc API Spec</h2>
+                            <p>Documentación técnica premium con lectura y navegación lateral de tres columnas. Ideal para revisión de contratos de la API y esquemas de datos.</p>
+                        </div>
+                        <div class="card-action">
+                            <svg viewBox="0 0 24 24"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+                        </div>
+                    </a>
+
+                    <!-- Django Admin Card -->
+                    <a href="/admin/" target="_blank" class="card">
+                        <div class="card-icon icon-admin">⚙️</div>
+                        <div class="card-text-wrapper">
+                            <h2>Panel de Control</h2>
+                            <p>Panel administrativo oficial del Mentor Virtual. Gestiona perfiles de usuarios, tokens de autenticación activos, accesibilidad y base de datos.</p>
+                        </div>
+                        <div class="card-action">
+                            <svg viewBox="0 0 24 24"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+                        </div>
+                    </a>
+                </section>
+            </div>
+
+            <!-- Right Side: 3D Robot Spline Animation -->
+            <div class="portal-aside">
+                <div class="animation-container">
+                    <spline-viewer url="https://prod.spline.design/CPmnwHmyeNPCXEe2/scene.splinecode"></spline-viewer>
+                </div>
+            </div>
+
+        </div>
+    </div>
+</body>
+</html>

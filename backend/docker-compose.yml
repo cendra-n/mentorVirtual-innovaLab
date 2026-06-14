@@ -1,0 +1,22 @@
+services:
+  db:
+    image: postgres:15
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_DB=mentor_db
+      - POSTGRES_USER=admin
+      - POSTGRES_PASSWORD=pass_secret
+  web:
+    build: .
+    volumes:
+      - .:/app
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=postgres://admin:pass_secret@db:5432/mentor_db
+    depends_on:
+      - db
+
+volumes:
+  postgres_data:
