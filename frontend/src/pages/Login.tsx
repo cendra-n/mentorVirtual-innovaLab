@@ -8,8 +8,8 @@ interface Props {
 
 export default function Login({ onLogin }: Props) {
   const [mode, setMode]         = useState<'login' | 'register'>('login')
-  const [username, setUsername] = useState('')
   const [email, setEmail]       = useState('')
+  const [username, setUsername] = useState('')  // solo para registro
   const [password, setPassword] = useState('')
   const [confirm, setConfirm]   = useState('')
   const [error, setError]       = useState('')
@@ -20,12 +20,12 @@ export default function Login({ onLogin }: Props) {
   const mentorName = import.meta.env.VITE_MENTOR_NAME || 'Pulso'
 
   const validate = () => {
-    if (!username.trim()) return 'El nombre de usuario es obligatorio.'
-    if (password.length < 8) return 'La contraseña debe tener al menos 8 caracteres.'
+    if (!email.trim())                    return 'El email es obligatorio.'
+    if (!/\S+@\S+\.\S+/.test(email))     return 'El email no es válido.'
+    if (password.length < 8)             return 'La contraseña debe tener al menos 8 caracteres.'
     if (mode === 'register') {
-      if (!email.trim()) return 'El email es obligatorio.'
-      if (!/\S+@\S+\.\S+/.test(email)) return 'El email no es válido.'
-      if (password !== confirm) return 'Las contraseñas no coinciden.'
+      if (!username.trim())              return 'El nombre de usuario es obligatorio.'
+      if (password !== confirm)          return 'Las contraseñas no coinciden.'
     }
     return null
   }
@@ -38,7 +38,7 @@ export default function Login({ onLogin }: Props) {
     setLoading(true)
     try {
       const res = mode === 'login'
-        ? await apiLogin(username, password)
+        ? await apiLogin(email, password)
         : await apiRegister(username, email, password)
 
       if (res.access) {
@@ -81,16 +81,10 @@ export default function Login({ onLogin }: Props) {
         <div className="login-card">
           {/* Tabs */}
           <div className="login-tabs">
-            <button
-              className={`login-tab ${mode === 'login' ? 'login-tab--active' : ''}`}
-              onClick={() => switchMode('login')}
-            >
+            <button className={`login-tab ${mode === 'login' ? 'login-tab--active' : ''}`} onClick={() => switchMode('login')}>
               Ingresar
             </button>
-            <button
-              className={`login-tab ${mode === 'register' ? 'login-tab--active' : ''}`}
-              onClick={() => switchMode('register')}
-            >
+            <button className={`login-tab ${mode === 'register' ? 'login-tab--active' : ''}`} onClick={() => switchMode('register')}>
               Registrarse
             </button>
           </div>
@@ -99,31 +93,34 @@ export default function Login({ onLogin }: Props) {
             <MentorBot mood={loading ? 'pensativo' : mode === 'login' ? 'guiñando' : 'emocionado'} size={52} />
             <div>
               <h2>{mode === 'login' ? `¡Hola! Soy ${mentorName}` : '¡Creá tu cuenta!'}</h2>
-              <p>{mode === 'login' ? 'Ingresá para continuar aprendiendo' : 'Empezá tu camino hoy'}</p>
+              <p>{mode === 'login' ? 'Ingresá con tu email para continuar' : 'Empezá tu camino hoy'}</p>
             </div>
           </div>
 
           <div className="login-form">
-            <label>Usuario</label>
+
+            {/* Email — siempre visible */}
+            <label>Email</label>
             <input
               className="form-input"
-              placeholder="Tu nombre de usuario"
-              value={username}
-              onChange={e => setUsername(e.target.value)}
-              onKeyDown={e => e.key === 'Enter' && handleSubmit()}
-              autoComplete="username"
+              type="email"
+              placeholder="tu@email.com"
+              value={email}
+              onChange={e => setEmail(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && mode === 'login' && handleSubmit()}
+              autoComplete="email"
             />
 
+            {/* Username — solo en registro */}
             {mode === 'register' && (
               <>
-                <label>Email</label>
+                <label>Nombre de usuario</label>
                 <input
                   className="form-input"
-                  type="email"
-                  placeholder="tu@email.com"
-                  value={email}
-                  onChange={e => setEmail(e.target.value)}
-                  autoComplete="email"
+                  placeholder="Tu nombre de usuario"
+                  value={username}
+                  onChange={e => setUsername(e.target.value)}
+                  autoComplete="username"
                 />
               </>
             )}
@@ -139,11 +136,7 @@ export default function Login({ onLogin }: Props) {
                 onKeyDown={e => e.key === 'Enter' && mode === 'login' && handleSubmit()}
                 autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
               />
-              <button
-                className="toggle-pass"
-                onClick={() => setShowPass(!showPass)}
-                tabIndex={-1}
-              >
+              <button className="toggle-pass" onClick={() => setShowPass(!showPass)} tabIndex={-1}>
                 {showPass ? '🙈' : '👁️'}
               </button>
             </div>
@@ -162,27 +155,22 @@ export default function Login({ onLogin }: Props) {
                     autoComplete="new-password"
                   />
                   {confirm && (
-                    <span className="pass-match">
-                      {confirm === password ? '✅' : '❌'}
-                    </span>
+                    <span className="pass-match">{confirm === password ? '✅' : '❌'}</span>
                   )}
                 </div>
-              </>
-            )}
 
-            {/* Indicador de fuerza de contraseña */}
-            {mode === 'register' && password && (
-              <div className="pass-strength">
-                <div className="pass-strength-bar">
-                  {[1,2,3,4].map(i => (
-                    <div
-                      key={i}
-                      className={`pass-strength-seg ${getStrength(password) >= i ? `strength-${getStrength(password)}` : ''}`}
-                    />
-                  ))}
-                </div>
-                <span className="pass-strength-label">{getStrengthLabel(password)}</span>
-              </div>
+                {/* Indicador de fuerza */}
+                {password && (
+                  <div className="pass-strength">
+                    <div className="pass-strength-bar">
+                      {[1,2,3,4].map(i => (
+                        <div key={i} className={`pass-strength-seg ${getStrength(password) >= i ? `strength-${getStrength(password)}` : ''}`} />
+                      ))}
+                    </div>
+                    <span className="pass-strength-label">{getStrengthLabel(password)}</span>
+                  </div>
+                )}
+              </>
             )}
 
             {error && <div className="form-error">⚠️ {error}</div>}
@@ -190,11 +178,9 @@ export default function Login({ onLogin }: Props) {
             <button
               className="btn-primary btn-full"
               onClick={handleSubmit}
-              disabled={loading || !username || !password || (mode === 'register' && !confirm)}
+              disabled={loading || !email || !password || (mode === 'register' && !confirm)}
             >
-              {loading
-                ? '⏳ Un momento...'
-                : mode === 'login' ? '→ Ingresar' : '✨ Crear cuenta'}
+              {loading ? '⏳ Un momento...' : mode === 'login' ? '→ Ingresar' : '✨ Crear cuenta'}
             </button>
           </div>
         </div>
@@ -213,6 +199,5 @@ function getStrength(pass: string): number {
 }
 
 function getStrengthLabel(pass: string): string {
-  const s = getStrength(pass)
-  return ['', 'Débil', 'Regular', 'Buena', 'Fuerte'][s]
+  return ['', 'Débil', 'Regular', 'Buena', 'Fuerte'][getStrength(pass)]
 }

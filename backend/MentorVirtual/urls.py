@@ -27,3 +27,9 @@ urlpatterns = [
     path('api/schema/redoc/',      SpectacularRedocView.as_view(url_name='schema'),       name='redoc'),
     path('api/docs/',              developer_portal,                                       name='dev-portal'),
 ]
+
+from django.views.generic import RedirectView
+from django.conf import settings
+urlpatterns += [
+    path('', RedirectView.as_view(url=settings.FRONTEND_URL)),
+]
