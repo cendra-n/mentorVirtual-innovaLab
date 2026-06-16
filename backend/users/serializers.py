@@ -114,7 +114,7 @@ class RegisterRequestSerializer(serializers.Serializer):
     )
     font_size = serializers.ChoiceField(
         choices=['SMALL', 'MEDIUM', 'LARGE'], required=False, default='MEDIUM',
-        error_messages={'invalid_choice': 'Opciones válidas: SMALL, MEDIUM, LARGE.'},
+        error_messages={'invalid_choice': 'El tamaño de fuente seleccionado no es válido. Las opciones permitidas son: SMALL, MEDIUM, LARGE.'},
         help_text="Tamaño de tipografía de accesibilidad (default: MEDIUM)."
     )
     high_contrast = serializers.BooleanField(
@@ -190,7 +190,7 @@ class ProfileUpdateSerializer(serializers.Serializer):
     )
     font_size = serializers.ChoiceField(
         choices=['SMALL', 'MEDIUM', 'LARGE'], required=False,
-        error_messages={'invalid_choice': 'Opciones válidas: SMALL, MEDIUM, LARGE.'},
+        error_messages={'invalid_choice': 'El tamaño de fuente seleccionado no es válido. Las opciones permitidas son: SMALL, MEDIUM, LARGE.'},
         help_text="Nuevo tamaño de tipografía."
     )
     high_contrast = serializers.BooleanField(

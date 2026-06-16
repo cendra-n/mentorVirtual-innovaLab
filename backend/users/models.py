@@ -21,6 +21,13 @@ class UserProfile(models.Model):
         null=True, blank=True,
         help_text="Hash/embedding del rostro para autenticación biométrica (Fase 3)."
     )
+    ROLE_CHOICES = (
+        ('ADMIN', 'Administrador'),
+        ('STUDENT', 'Alumno'),
+        ('PROFESSOR', 'Profesor'),
+    )
+    role = models.CharField(max_length=20, choices=ROLE_CHOICES, default='STUDENT')
+
     avatar_url = models.CharField(
         max_length=255, blank=True,
         help_text="URL de la imagen de avatar del usuario."
@@ -66,7 +73,7 @@ class UserConfig(models.Model):
 @receiver(post_save, sender=User)
 def create_user_profile_and_config(sender, instance, created, **kwargs):
     if created:
-        UserProfile.objects.create(user=instance)
+        UserProfile.objects.create(user=instance, role='STUDENT')
         UserConfig.objects.create(user=instance)
 
 @receiver(post_save, sender=User)
@@ -75,3 +82,4 @@ def save_user_profile_and_config(sender, instance, **kwargs):
         instance.profile.save()
     if hasattr(instance, 'config'):
         instance.config.save()
+# Campo agregado — requerido por migración 0002_userprofile_role
