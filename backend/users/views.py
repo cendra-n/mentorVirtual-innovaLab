@@ -13,13 +13,13 @@ from django.contrib.auth import authenticate
 from django.contrib.auth.models import User
 from django.contrib.auth.hashers import make_password
 from rest_framework.decorators import api_view, permission_classes, authentication_classes
-from rest_framework.permissions import AllowAny, IsAuthenticated
+from rest_framework.permissions import AllowAny, IsAuthenticated, IsAdminUser 
 from rest_framework.response import Response
 from rest_framework import status, serializers
-from rest_framework.pagination import PageNumberPagination
+from .pagination import CustomPagination
 from rest_framework_simplejwt.tokens import RefreshToken
 from drf_spectacular.utils import (
-    extend_schema, OpenApiResponse, OpenApiExample, inline_serializer
+    extend_schema, OpenApiResponse, OpenApiExample, OpenApiParameter, inline_serializer
 )
 
 from .serializers import (
@@ -328,26 +328,62 @@ def api_change_password(request):
 
 @extend_schema(
     tags=['auth'],
-    summary="Listado de usuarios (paginado)",
-    description="Solo staff. Devuelve 10 usuarios por página.",
+    summary="Listado de todos los usuarios (Paginado)",
+    description="Acceso restringido solo para miembros del Staff. Retorna una lista paginada de todos los usuarios registrados, incluyendo su perfil y su configuración de accesibilidad. Devuelve 10 registros por página.",
+    # 🌟 SOLUCIÓN CORRECTA: Inyectamos el parámetro compatible con vistas de función
+    parameters=[
+        OpenApiParameter(
+            name='page',
+            type=int,
+            location=OpenApiParameter.QUERY,
+            required=False,
+            default=1,
+            description='Número de página a consultar. Por defecto es la página 1.'
+        )
+    ],
     responses={
-        200: inline_serializer('PaginatedUserList', fields={
-            'count':    serializers.IntegerField(),
-            'next':     serializers.URLField(allow_null=True),
-            'previous': serializers.URLField(allow_null=True),
-            'results':  UserDetailSerializer(many=True),
-        })
+        200: inline_serializer(
+            name='PaginatedUserListWithTotal',
+            fields={
+                'count': serializers.IntegerField(help_text='Total number of users'),
+                'total_pages': serializers.IntegerField(help_text='Total number of pages available'),
+                'next': serializers.URLField(allow_null=True, help_text='URL of the next page of users'),
+                'previous': serializers.URLField(allow_null=True, help_text='URL of the previous page of users'),
+                'results': UserDetailSerializer(many=True)
+            }
+        ),
+        404: inline_serializer(
+            name='PaginationErrorResponse',
+            fields={
+                'detail': serializers.CharField(help_text='Mensaje de error cuando la página está vacía')
+            }
+        ),
+        403: inline_serializer(
+            name='PermissionErrorResponse',
+            fields={
+                'detail': serializers.CharField(help_text='Las credenciales de autenticación no proveen privilegios de staff.')
+            }
+        )
     }
 )
 @api_view(['GET'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsAuthenticated, IsAdminUser])
 def api_users_list(request):
-    if not request.user.is_staff:
-        return Response({'error': 'Acceso restringido.'}, status=status.HTTP_403_FORBIDDEN)
-
+    """
+    Vista que devuelve el listado de todos los usuarios registrados con paginación personalizada.
+    Requiere que el usuario esté autenticado y sea parte del Staff (is_staff=True).
+    """
+    # Traemos la query optimizada de la base de datos
     users = User.objects.select_related('profile', 'config').all().order_by('id')
-    paginator = PageNumberPagination()
-    paginator.page_size = 10
-    page    = paginator.paginate_queryset(users, request)
-    serializer = UserDetailSerializer(page, many=True)
+    
+    # Instanciamos tu paginador que calcula las páginas reales ante errores
+    paginator = CustomPagination()
+    
+    # Paginamos el QuerySet
+    paginated_users = paginator.paginate_queryset(users, request)
+    
+    # Serializamos únicamente los datos de la página actual
+    serializer = UserDetailSerializer(paginated_users, many=True)
+    
+    # Retornamos la respuesta enriquecida (count, total_pages, next, previous, results)
     return paginator.get_paginated_response(serializer.data)
