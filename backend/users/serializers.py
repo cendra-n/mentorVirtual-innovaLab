@@ -143,17 +143,23 @@ class RegisterRequestSerializer(serializers.Serializer):
                 'password': ['La contraseña debe contener mínimo 8 caracteres, una mayúscula, un número y un carácter especial.']
             })
 
-        email = data.get('email', '').lower()
+        email = data.get('email', '').strip().lower()
+        data['email'] = email
         if email and User.objects.filter(email=email).exists():
             raise serializers.ValidationError({
                 'email': ['Este correo electrónico ya se encuentra registrado.']
             })
 
-        username = data.get('username', '').lower()
+        username = data.get('username', '').strip().lower()
+        data['username'] = username
         if username:
             if ' ' in username:
                 raise serializers.ValidationError({
                     'username': ['El nombre de usuario no puede contener espacios.']
+                })
+            if username.isdigit():
+                raise serializers.ValidationError({
+                    'username': ['El nombre de usuario no puede estar compuesto únicamente por números.']
                 })
             import re
             if not re.match(r'^[\w.@+-]+$', username):
