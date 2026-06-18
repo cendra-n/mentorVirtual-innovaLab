@@ -13,4 +13,5 @@ urlpatterns = [
     path('change_password/', api_change_password, name='change-password'),
     path('users/',           api_users_list,      name='api_users_list'),
     path('token/refresh/',   TokenRefreshView.as_view(), name='token_refresh'),
+    path('profile/student/update/', api_update_student_profile, name='update-student-profile'),
 ]

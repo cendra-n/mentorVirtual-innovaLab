@@ -1,7 +1,7 @@
 from rest_framework import serializers
 from django.contrib.auth.models import User
 from django.core.validators import RegexValidator
-from .models import UserProfile, UserConfig
+from .models import UserProfile, UserConfig, StudentProfile
 
 
 class UserConfigSerializer(serializers.ModelSerializer):
@@ -34,7 +34,6 @@ class UserDetailSerializer(serializers.ModelSerializer):
             return {'font_size': 'MEDIUM', 'high_contrast': False, 'voice_guidance': False}
         return UserConfigSerializer(obj.config).data
 
-
 class LoginRequestSerializer(serializers.Serializer):
     email = serializers.EmailField(
         required=True,
@@ -55,13 +54,11 @@ class LoginRequestSerializer(serializers.Serializer):
         help_text="Contraseña de la cuenta."
     )
 
-
 class LoginResponseSerializer(serializers.Serializer):
     message = serializers.CharField()
     refresh = serializers.CharField(help_text="Refresh token JWT.")
     access  = serializers.CharField(help_text="Access token JWT (Bearer).")
     user    = UserDetailSerializer()
-
 
 class RegisterRequestSerializer(serializers.Serializer):
     username = serializers.CharField(
@@ -173,7 +170,6 @@ class RegisterRequestSerializer(serializers.Serializer):
 
         return data
 
-
 class RegisterResponseSerializer(serializers.Serializer):
     message = serializers.CharField()
     refresh = serializers.CharField(help_text="Refresh token JWT.")
@@ -228,3 +224,18 @@ class LogoutResponseSerializer(serializers.Serializer):
     message = serializers.CharField(
         help_text="Confirmación del cierre de sesión."
     )
+    
+class StudentProfileSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = StudentProfile
+        # Se excluye el 'user' porque ya viene del contexto del token (request.user)
+        exclude = ['user']
+        extra_kwargs = {field: {'required': False} for field in [
+            'fecha_nacimiento',
+            'nivel_educativo',
+            'estado_laboral',
+            'intereses',
+            'genero',
+            'objetivo_principal',
+            'disponibilidad_tiempo'
+            ]}

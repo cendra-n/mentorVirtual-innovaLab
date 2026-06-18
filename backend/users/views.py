@@ -9,6 +9,8 @@ Combina:
 - api_profile con GET/PUT/PATCH
 - Paginación en listado de usuarios
 """
+from .serializers import StudentProfileSerializer
+from .models import StudentProfile
 from django.contrib.auth import authenticate
 from django.contrib.auth.models import User
 from django.contrib.auth.hashers import make_password
@@ -387,3 +389,34 @@ def api_users_list(request):
     
     # Retornamos la respuesta enriquecida (count, total_pages, next, previous, results)
     return paginator.get_paginated_response(serializer.data)
+
+
+# Vista de StudentProfile
+
+@extend_schema(
+    summary="Actualizar perfil de estudiante",
+    description="Actualización parcial de los datos de perfil demográfico y de intereses para analítica.",
+    request=StudentProfileSerializer,
+    responses={200: StudentProfileSerializer}
+)
+@api_view(['PATCH'])
+@permission_classes([IsAuthenticated])
+def api_update_student_profile(request):
+    """
+    Vista para actualizar los campos del perfil analítico del estudiante.
+    """
+    try:
+        # Accedemos al perfil relacionado mediante la relación 'student_analytics'
+        profile = request.user.student_analytics
+    except StudentProfile.DoesNotExist:
+        return Response(
+            {"detail": "Perfil de estudiante no encontrado."}, 
+            status=status.HTTP_404_NOT_FOUND
+        )
+
+    serializer = StudentProfileSerializer(profile, data=request.data, partial=True)
+    if serializer.is_valid():
+        serializer.save()
+        return Response(serializer.data, status=status.HTTP_200_OK)
+    
+    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
