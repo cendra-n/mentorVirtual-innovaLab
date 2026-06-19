@@ -17,6 +17,6 @@ services:
       - DATABASE_URL=postgres://admin:pass_secret@db:5432/mentor_db
     depends_on:
       - db
-
+    # command: python manage.py runserver 0.0.0.0:8000 
 volumes:
   postgres_data:

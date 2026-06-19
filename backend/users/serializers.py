@@ -214,7 +214,6 @@ class ProfileUpdateSerializer(serializers.Serializer):
                 )
         return value
 
-
 class ProfileUpdateResponseSerializer(serializers.Serializer):
     message = serializers.CharField()
     user    = UserDetailSerializer()
@@ -230,12 +229,82 @@ class StudentProfileSerializer(serializers.ModelSerializer):
         model = StudentProfile
         # Se excluye el 'user' porque ya viene del contexto del token (request.user)
         exclude = ['user']
-        extra_kwargs = {field: {'required': False} for field in [
-            'fecha_nacimiento',
-            'nivel_educativo',
-            'estado_laboral',
-            'intereses',
-            'genero',
-            'objetivo_principal',
-            'disponibilidad_tiempo'
-            ]}
+        extra_kwargs = {
+            'fecha_nacimiento': {
+                'label': 'Fecha de nacimiento',
+                'help_text': 'Fecha de nacimiento en formato YYYY-MM-DD.',
+                'required': False
+            },
+            'nivel_educativo': {
+                'label': 'Nivel Educativo',
+                'help_text': 'Nivel educativo alcanzado (ej: primario_completo, secundario_completo).',
+                'required': False
+            },
+            'estado_laboral': {
+                'label': 'Estado laboral',
+                'help_text': 'Situación laboral actual (activo, desempleado).',
+                'required': False
+            },
+            'intereses': {
+                'label': 'Intereses',
+                'help_text': 'Lista de intereses como arreglo de strings, ej: ["Programación", "Diseño"].',
+                'required': False
+            },
+            'genero': {
+                'label': 'Género',
+                'help_text': 'Género (M, F, NB, ND).',
+                'required': False
+            },
+            'objetivo_principal': {
+                'label': 'Objetivo principal',
+                'help_text': 'Motivación principal para usar la app (empleo, personal, estudios, hobby).',
+                'required': False
+            },
+            'disponibilidad_tiempo': {
+                'label': 'Disponibilidad de tiempo',
+                'help_text': 'Tiempo estimado disponible semanalmente (baja, media, alta).',
+                'required': False
+            },
+            
+            'zona_horaria': {
+                'read_only': True,
+                'label': 'Zona horaria',
+                'read_only': True, 
+            },
+            
+            'frecuencia_entradas': {
+                'read_only': True,
+                'min_value': 0,
+                'max_value': 10000
+            },
+            'racha_actual_dias': {
+                'read_only': True,
+                'min_value': 0,
+                'max_value': 3650
+            },
+            'racha_maxima_dias': {
+                'read_only': True,
+                'min_value': 0,
+                'max_value': 3650
+            },
+            'tiempo_acumulado_app_minutos': {
+                'read_only': True,
+                'min_value': 0.0
+            },
+            'tiempo_interaccion_mentor_minutos': {
+                'read_only': True,
+                'min_value': 0.0
+            },
+            'cantidad_videos_vistos': {
+                'read_only': True,
+                'min_value': 0
+            },
+            'tiempo_api_youtube_minutos': {
+                'read_only': True,
+                'min_value': 0.0
+            },
+            'desafios_completados': {
+                'read_only': True,
+                'min_value': 0
+            },
+        }

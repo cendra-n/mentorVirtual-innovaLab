@@ -72,7 +72,7 @@ class UserConfig(models.Model):
 
 # ── MODELOS DE DATA ANALYTICS ────────────────
 
-class StudentProfile(models.model):
+class StudentProfile(models.Model):
     """
     Perfil extendido exclusivo para los estudiantes.
     Diseñado para capturar métricas de engagement, progreso y calidad de datos
@@ -110,7 +110,8 @@ class StudentProfile(models.model):
         
     GENERO_CHOICES = [
         ('M', 'Masculino'),
-        ('F', 'Femenino'),
+        ('F', 'Femenino'), 
+        #poner "otro"
         ('ND', 'Prefiero no decirlo'),
     ]
     genero = models.CharField(max_length=2, choices=GENERO_CHOICES, blank=True)
@@ -136,20 +137,20 @@ class StudentProfile(models.model):
         help_text="Zona horaria del usuario para sincronización de notificaciones y eventos."
     )
     
-    intereses = ArrayField(models.CharField(max_length=50), blank=True, default=list)
+    intereses = models.JSONField(default=list, blank=True)
 
     # --- DATOS DE COMPORTAMIENTO ---
     
     frecuencia_entradas = models.PositiveIntegerField(default=0)
     racha_actual_dias = models.PositiveIntegerField(default=0)
     racha_maxima_dias = models.PositiveIntegerField(default=0)
-    tiempo_acumulado_app_minutos = models.PositiveIntegerField(default=0)
-    tiempo_interaccion_mentor_minutos = models.PositiveIntegerField(default=0)
+    tiempo_acumulado_app_minutos = models.FloatField(default=0)
+    tiempo_interaccion_mentor_minutos = models.FloatField(default=0)
     
     # --- DATOS DE PROGRESO ---
     
     cantidad_videos_vistos = models.PositiveIntegerField(default=0)
-    tiempo_api_youtube_minutos = models.PositiveIntegerField(default=0)
+    tiempo_api_youtube_minutos = models.FloatField(default=0)
     desafios_completados = models.PositiveIntegerField(default=0)
 
     def __str__(self):
@@ -162,9 +163,7 @@ def create_user_profile_and_config(sender, instance, created, **kwargs):
     if created:
         UserProfile.objects.create(user=instance, role='STUDENT')
         UserConfig.objects.create(user=instance)
-        
-        if profile.role == 'STUDENT':
-            StudentProfile.objects.create(user=instance)
+        StudentProfile.objects.get_or_create(user=instance)
 
 @receiver(post_save, sender=User)
 def save_user_profile_and_config(sender, instance, **kwargs):

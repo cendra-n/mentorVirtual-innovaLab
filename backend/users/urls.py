@@ -1,7 +1,7 @@
 from django.urls import path
 from .views import (
     api_login, api_register, api_logout,
-    api_profile, api_change_password, api_users_list,
+    api_profile, api_change_password, api_users_list, api_update_student_profile
 )
 from rest_framework_simplejwt.views import TokenRefreshView
 

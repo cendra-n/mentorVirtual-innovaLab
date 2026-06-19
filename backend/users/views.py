@@ -406,13 +406,9 @@ def api_update_student_profile(request):
     Vista para actualizar los campos del perfil analítico del estudiante.
     """
     try:
-        # Accedemos al perfil relacionado mediante la relación 'student_analytics'
-        profile = request.user.student_analytics
-    except StudentProfile.DoesNotExist:
-        return Response(
-            {"detail": "Perfil de estudiante no encontrado."}, 
-            status=status.HTTP_404_NOT_FOUND
-        )
+        profile, created = StudentProfile.objects.get_or_create(user=request.user)
+    except Exception as e:
+        return Response({"detail": "Error al acceder al perfil."}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
     serializer = StudentProfileSerializer(profile, data=request.data, partial=True)
     if serializer.is_valid():
