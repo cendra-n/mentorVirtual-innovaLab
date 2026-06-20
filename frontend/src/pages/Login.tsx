@@ -30,6 +30,11 @@ export default function Login({ onLogin }: Props) {
     return null
   }
 
+  const handleBlur = () => {
+    const err = validate()
+    setError(err || '')
+  }
+
   const handleSubmit = async () => {
     setError('')
     const err = validate()
@@ -112,6 +117,7 @@ export default function Login({ onLogin }: Props) {
               value={email}
               onChange={e => setEmail(e.target.value)}
               onKeyDown={e => e.key === 'Enter' && mode === 'login' && handleSubmit()}
+              onBlur={handleBlur}
               autoComplete="email"
             />
 
@@ -123,6 +129,7 @@ export default function Login({ onLogin }: Props) {
                   placeholder="Tu nombre de usuario"
                   value={username}
                   onChange={e => setUsername(e.target.value)}
+                  onBlur={handleBlur}
                   autoComplete="username"
                 />
               </>
@@ -137,6 +144,7 @@ export default function Login({ onLogin }: Props) {
                 value={password}
                 onChange={e => setPassword(e.target.value)}
                 onKeyDown={e => e.key === 'Enter' && mode === 'login' && handleSubmit()}
+                onBlur={handleBlur}
                 autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
               />
               <button
@@ -159,6 +167,7 @@ export default function Login({ onLogin }: Props) {
                     value={confirm}
                     onChange={e => setConfirm(e.target.value)}
                     onKeyDown={e => e.key === 'Enter' && handleSubmit()}
+                    onBlur={handleBlur}
                     autoComplete="new-password"
                   />
                   {confirm && (
