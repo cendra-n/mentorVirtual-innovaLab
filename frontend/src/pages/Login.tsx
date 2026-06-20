@@ -20,11 +20,11 @@ export default function Login({ onLogin }: Props) {
   const mentorName = import.meta.env.VITE_MENTOR_NAME || 'Pulso'
 
   const validate = () => {
-    if (!username.trim()) return 'El nombre de usuario es obligatorio.'
+    if (!email.trim()) return 'El email es obligatorio.'
+    if (!/\S+@\S+\.\S+/.test(email)) return 'El email no es válido.'
     if (password.length < 8) return 'La contraseña debe tener al menos 8 caracteres.'
     if (mode === 'register') {
-      if (!email.trim()) return 'El email es obligatorio.'
-      if (!/\S+@\S+\.\S+/.test(email)) return 'El email no es válido.'
+      if (!username.trim()) return 'El nombre de usuario es obligatorio.'
       if (password !== confirm) return 'Las contraseñas no coinciden.'
     }
     return null
@@ -38,8 +38,8 @@ export default function Login({ onLogin }: Props) {
     setLoading(true)
     try {
       const res = mode === 'login'
-        ? await apiLogin(username, password)
-        : await apiRegister(username, email, password)
+      ? await apiLogin(email, password)
+      : await apiRegister(username, email, password, confirm)
 
       if (res.access) {
         onLogin(res.access, res.refresh)
@@ -104,26 +104,26 @@ export default function Login({ onLogin }: Props) {
           </div>
 
           <div className="login-form">
-            <label>Usuario</label>
+            <label>Email</label>
             <input
               className="form-input"
-              placeholder="Tu nombre de usuario"
-              value={username}
-              onChange={e => setUsername(e.target.value)}
-              onKeyDown={e => e.key === 'Enter' && handleSubmit()}
-              autoComplete="username"
+              type="email"
+              placeholder="tu@email.com"
+              value={email}
+              onChange={e => setEmail(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && mode === 'login' && handleSubmit()}
+              autoComplete="email"
             />
 
             {mode === 'register' && (
               <>
-                <label>Email</label>
+                <label>Usuario</label>
                 <input
                   className="form-input"
-                  type="email"
-                  placeholder="tu@email.com"
-                  value={email}
-                  onChange={e => setEmail(e.target.value)}
-                  autoComplete="email"
+                  placeholder="Tu nombre de usuario"
+                  value={username}
+                  onChange={e => setUsername(e.target.value)}
+                  autoComplete="username"
                 />
               </>
             )}
@@ -190,7 +190,7 @@ export default function Login({ onLogin }: Props) {
             <button
               className="btn-primary btn-full"
               onClick={handleSubmit}
-              disabled={loading || !username || !password || (mode === 'register' && !confirm)}
+              disabled={loading || !email || !password || (mode === 'register' && !confirm)}
             >
               {loading
                 ? '⏳ Un momento...'
