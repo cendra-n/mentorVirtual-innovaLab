@@ -96,6 +96,17 @@ if DATABASE_URL:
             'PORT': url.port or 5432,
         }
     }
+elif os.environ.get('POSTGRES_DB'):
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.postgresql',
+            'NAME': os.environ.get('POSTGRES_DB', 'MentorVirtual'),
+            'USER': os.environ.get('POSTGRES_USER', 'postgres'),
+            'PASSWORD': os.environ.get('POSTGRES_PASSWORD', 'postgres'),
+            'HOST': os.environ.get('POSTGRES_HOST', 'postgres'),
+            'PORT': int(os.environ.get('POSTGRES_PORT', 5432)),
+        }
+    }
 else:
     DATABASES = {
         'default': {

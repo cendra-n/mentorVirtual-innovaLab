@@ -292,3 +292,49 @@ class UserEndpointsTestCase(APITestCase):
         data = {'refresh': self.refresh_token_str}
         response = self.client.post(url, data, format='json')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+    # ── ESTUDIANTE ANALYTICS PROFILE ──────────────────────────────────────────
+
+    def test_api_update_student_profile_success(self):
+        """PATCH actualiza los campos demográficos y de intereses de StudentProfile."""
+        url = reverse('update-student-profile')
+        self.client.credentials(HTTP_AUTHORIZATION='Bearer ' + self.access_token)
+        data = {
+            'nivel_educativo': 'secundario_completo',
+            'estado_laboral': 'activo',
+            'genero': 'ND',
+            'objetivo_principal': 'empleo',
+            'disponibilidad_tiempo': 'alta',
+            'intereses': ['Programación', 'Ciencia de Datos']
+        }
+        response = self.client.patch(url, data, format='json')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['nivel_educativo'], 'secundario_completo')
+        self.assertEqual(response.data['estado_laboral'], 'activo')
+        self.assertEqual(response.data['genero'], 'ND')
+        self.assertEqual(response.data['objetivo_principal'], 'empleo')
+        self.assertEqual(response.data['disponibilidad_tiempo'], 'alta')
+        self.assertEqual(response.data['intereses'], ['Programación', 'Ciencia de Datos'])
+
+    def test_api_update_student_profile_unauthorized(self):
+        """El endpoint requiere autenticación — devuelve 401 sin token."""
+        url = reverse('update-student-profile')
+        response = self.client.patch(url, {}, format='json')
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_api_update_student_profile_read_only_fields(self):
+        """Los campos de analítica marcados como read_only no deben poder ser modificados."""
+        url = reverse('update-student-profile')
+        self.client.credentials(HTTP_AUTHORIZATION='Bearer ' + self.access_token)
+        data = {
+            'tiempo_acumulado_app_minutos': 999.9,
+            'racha_actual_dias': 50,
+            'cantidad_videos_vistos': 100
+        }
+        response = self.client.patch(url, data, format='json')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        # El perfil del estudiante en la base de datos debe seguir con los valores por defecto (0)
+        self.assertEqual(response.data['tiempo_acumulado_app_minutos'], 0.0)
+        self.assertEqual(response.data['racha_actual_dias'], 0)
+        self.assertEqual(response.data['cantidad_videos_vistos'], 0)
+
