@@ -8,8 +8,8 @@ interface Props {
 
 export default function Login({ onLogin }: Props) {
   const [mode, setMode]         = useState<'login' | 'register'>('login')
-  const [username, setUsername] = useState('')
   const [email, setEmail]       = useState('')
+  const [username, setUsername] = useState('')  // solo para registro
   const [password, setPassword] = useState('')
   const [confirm, setConfirm]   = useState('')
   const [error, setError]       = useState('')
@@ -86,16 +86,10 @@ export default function Login({ onLogin }: Props) {
         <div className="login-card">
           {/* Tabs */}
           <div className="login-tabs">
-            <button
-              className={`login-tab ${mode === 'login' ? 'login-tab--active' : ''}`}
-              onClick={() => switchMode('login')}
-            >
+            <button className={`login-tab ${mode === 'login' ? 'login-tab--active' : ''}`} onClick={() => switchMode('login')}>
               Ingresar
             </button>
-            <button
-              className={`login-tab ${mode === 'register' ? 'login-tab--active' : ''}`}
-              onClick={() => switchMode('register')}
-            >
+            <button className={`login-tab ${mode === 'register' ? 'login-tab--active' : ''}`} onClick={() => switchMode('register')}>
               Registrarse
             </button>
           </div>
@@ -104,11 +98,13 @@ export default function Login({ onLogin }: Props) {
             <MentorBot mood={loading ? 'pensativo' : mode === 'login' ? 'guiñando' : 'emocionado'} size={52} />
             <div>
               <h2>{mode === 'login' ? `¡Hola! Soy ${mentorName}` : '¡Creá tu cuenta!'}</h2>
-              <p>{mode === 'login' ? 'Ingresá para continuar aprendiendo' : 'Empezá tu camino hoy'}</p>
+              <p>{mode === 'login' ? 'Ingresá con tu email para continuar' : 'Empezá tu camino hoy'}</p>
             </div>
           </div>
 
           <div className="login-form">
+
+            {/* Email — siempre visible */}
             <label>Email</label>
             <input
               className="form-input"
@@ -121,9 +117,10 @@ export default function Login({ onLogin }: Props) {
               autoComplete="email"
             />
 
+            {/* Username — solo en registro */}
             {mode === 'register' && (
               <>
-                <label>Usuario</label>
+                <label>Nombre de usuario</label>
                 <input
                   className="form-input"
                   placeholder="Tu nombre de usuario"
@@ -147,11 +144,7 @@ export default function Login({ onLogin }: Props) {
                 onBlur={handleBlur}
                 autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
               />
-              <button
-                className="toggle-pass"
-                onClick={() => setShowPass(!showPass)}
-                tabIndex={-1}
-              >
+              <button className="toggle-pass" onClick={() => setShowPass(!showPass)} tabIndex={-1}>
                 {showPass ? '🙈' : '👁️'}
               </button>
             </div>
@@ -171,27 +164,22 @@ export default function Login({ onLogin }: Props) {
                     autoComplete="new-password"
                   />
                   {confirm && (
-                    <span className="pass-match">
-                      {confirm === password ? '✅' : '❌'}
-                    </span>
+                    <span className="pass-match">{confirm === password ? '✅' : '❌'}</span>
                   )}
                 </div>
-              </>
-            )}
 
-            {/* Indicador de fuerza de contraseña */}
-            {mode === 'register' && password && (
-              <div className="pass-strength">
-                <div className="pass-strength-bar">
-                  {[1,2,3,4].map(i => (
-                    <div
-                      key={i}
-                      className={`pass-strength-seg ${getStrength(password) >= i ? `strength-${getStrength(password)}` : ''}`}
-                    />
-                  ))}
-                </div>
-                <span className="pass-strength-label">{getStrengthLabel(password)}</span>
-              </div>
+                {/* Indicador de fuerza */}
+                {password && (
+                  <div className="pass-strength">
+                    <div className="pass-strength-bar">
+                      {[1,2,3,4].map(i => (
+                        <div key={i} className={`pass-strength-seg ${getStrength(password) >= i ? `strength-${getStrength(password)}` : ''}`} />
+                      ))}
+                    </div>
+                    <span className="pass-strength-label">{getStrengthLabel(password)}</span>
+                  </div>
+                )}
+              </>
             )}
 
             {error && <div className="form-error">⚠️ {error}</div>}
@@ -201,9 +189,7 @@ export default function Login({ onLogin }: Props) {
               onClick={handleSubmit}
               disabled={loading || !email || !password || (mode === 'register' && !confirm)}
             >
-              {loading
-                ? '⏳ Un momento...'
-                : mode === 'login' ? '→ Ingresar' : '✨ Crear cuenta'}
+              {loading ? '⏳ Un momento...' : mode === 'login' ? '→ Ingresar' : '✨ Crear cuenta'}
             </button>
           </div>
         </div>

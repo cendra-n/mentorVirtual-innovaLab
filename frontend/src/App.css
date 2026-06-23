@@ -600,3 +600,8 @@ input, textarea { font-family: var(--ff); }
   height: 100%;
   border: none;
 }
+
+/* ── Goal card delete ────────────────────────────────────────────────────────  */
+.goal-card-actions { display: flex; flex-direction: column; gap: 6px; align-items: flex-end; flex-shrink: 0; }
+.goal-delete-btn { background: #fee2e2; color: var(--rojo); border: 1px solid #fca5a5; padding: 6px 10px; border-radius: 50px; font-size: 13px; transition: all .2s; }
+.goal-delete-btn:hover { background: var(--rojo); color: white; }

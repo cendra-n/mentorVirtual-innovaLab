@@ -9,3 +9,6 @@ drf-spectacular>=0.27
 sentence-transformers>=3.0
 pdfplumber>=0.11
 torch>=2.3
+pytest>=9.0
+pytest-django>=4.0
+pytest-html>=4.0

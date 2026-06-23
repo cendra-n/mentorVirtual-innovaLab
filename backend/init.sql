@@ -1,8 +1,11 @@
 -- ============================================================
 --  Mentor Virtual Adaptativo — init.sql
---  Tablas propias + Stored Procedures
+--  Tablas propias + Stored Procedures + Tutor RAG
 --  Las tablas de auth.* las crea Django con migrate
+--  Requiere: pgvector extension
 -- ============================================================
+
+CREATE EXTENSION IF NOT EXISTS vector;
 
 -- ── Tablas ───────────────────────────────────────────────────────────────────
 
@@ -10,29 +13,27 @@ CREATE TABLE IF NOT EXISTS goals (
     id          SERIAL PRIMARY KEY,
     user_id     INTEGER NOT NULL REFERENCES auth_user(id) ON DELETE CASCADE,
     goal_text   TEXT    NOT NULL,
-    status      VARCHAR(20) NOT NULL DEFAULT 'active',   -- active | completed | archived
+    status      VARCHAR(20) NOT NULL DEFAULT 'active',
     created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
-
 CREATE INDEX IF NOT EXISTS idx_goals_user ON goals(user_id);
 
 CREATE TABLE IF NOT EXISTS steps (
     id             SERIAL PRIMARY KEY,
     goal_id        INTEGER NOT NULL REFERENCES goals(id) ON DELETE CASCADE,
-    "order"        SMALLINT NOT NULL,
+    "order"        INTEGER NOT NULL,
     title          VARCHAR(255) NOT NULL,
     description    TEXT,
     youtube_query  TEXT,
     completed      BOOLEAN NOT NULL DEFAULT FALSE,
     completed_at   TIMESTAMPTZ
 );
-
 CREATE INDEX IF NOT EXISTS idx_steps_goal ON steps(goal_id);
 
 CREATE TABLE IF NOT EXISTS videos (
     id         SERIAL PRIMARY KEY,
     step_id    INTEGER NOT NULL REFERENCES steps(id) ON DELETE CASCADE,
-    video_id   VARCHAR(20)  NOT NULL,   -- YouTube video ID
+    video_id   VARCHAR(20)  NOT NULL,
     title      TEXT         NOT NULL,
     thumbnail  TEXT,
     url        TEXT         NOT NULL,
@@ -73,10 +74,29 @@ CREATE TABLE IF NOT EXISTS streaks (
     last_activity   DATE
 );
 
+CREATE TABLE IF NOT EXISTS tutor_books (
+    id         SERIAL PRIMARY KEY,
+    user_id    INTEGER REFERENCES auth_user(id) ON DELETE CASCADE,
+    title      VARCHAR(255) NOT NULL,
+    subject    VARCHAR(100),
+    filename   VARCHAR(255),
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
 
--- ── Stored Procedures ─────────────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS tutor_chunks (
+    id         SERIAL PRIMARY KEY,
+    book_id    INTEGER REFERENCES tutor_books(id) ON DELETE CASCADE,
+    content    TEXT NOT NULL,
+    page_num   INTEGER,
+    embedding  vector(384),
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_chunks_book ON tutor_chunks(book_id);
+CREATE INDEX IF NOT EXISTS idx_chunks_embedding ON tutor_chunks
+    USING ivfflat (embedding vector_cosine_ops) WITH (lists = 100);
 
--- ── Goals ──────────────────────────────────────────────────────────────────
+
+-- ── Stored Procedures — Goals ─────────────────────────────────────────────────
 
 CREATE OR REPLACE FUNCTION sp_get_goal_by_user_and_text(p_user_id INT, p_goal_text TEXT)
 RETURNS TABLE(id INT, user_id INT, goal_text TEXT, status VARCHAR, created_at TIMESTAMPTZ) AS $$
@@ -90,7 +110,6 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
-
 CREATE OR REPLACE FUNCTION sp_create_goal(p_user_id INT, p_goal_text TEXT)
 RETURNS TABLE(id INT) AS $$
 BEGIN
@@ -101,7 +120,6 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
-
 CREATE OR REPLACE FUNCTION sp_get_goals_by_user(p_user_id INT)
 RETURNS TABLE(
     id INT, goal_text TEXT, status VARCHAR, created_at TIMESTAMPTZ,
@@ -109,13 +127,9 @@ RETURNS TABLE(
 ) AS $$
 BEGIN
     RETURN QUERY
-    SELECT
-        g.id,
-        g.goal_text,
-        g.status,
-        g.created_at,
-        COUNT(s.id)                                          AS total_steps,
-        COUNT(s.id) FILTER (WHERE s.completed = TRUE)       AS completed_steps
+    SELECT g.id, g.goal_text, g.status, g.created_at,
+        COUNT(s.id) AS total_steps,
+        COUNT(s.id) FILTER (WHERE s.completed = TRUE) AS completed_steps
     FROM goals g
     LEFT JOIN steps s ON s.goal_id = g.id
     WHERE g.user_id = p_user_id
@@ -123,7 +137,6 @@ BEGIN
     ORDER BY g.created_at DESC;
 END;
 $$ LANGUAGE plpgsql;
-
 
 CREATE OR REPLACE FUNCTION sp_get_goal_detail(p_goal_id INT, p_user_id INT)
 RETURNS TABLE(id INT, user_id INT, goal_text TEXT, status VARCHAR, created_at TIMESTAMPTZ) AS $$
@@ -137,10 +150,10 @@ END;
 $$ LANGUAGE plpgsql;
 
 
--- ── Steps ──────────────────────────────────────────────────────────────────
+-- ── Stored Procedures — Steps ─────────────────────────────────────────────────
 
 CREATE OR REPLACE FUNCTION sp_create_step(
-    p_goal_id INT, p_order SMALLINT, p_title VARCHAR, p_description TEXT, p_youtube_query TEXT
+    p_goal_id INT, p_order INT, p_title VARCHAR, p_description TEXT, p_youtube_query TEXT
 )
 RETURNS TABLE(id INT) AS $$
 BEGIN
@@ -151,18 +164,16 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
-
+-- ── FIX: usar alias g para evitar ambigüedad del id ──────────────────────────
 CREATE OR REPLACE FUNCTION sp_get_steps_by_goal(p_goal_id INT, p_user_id INT)
 RETURNS TABLE(
     id INT, goal_id INT, "order" SMALLINT, title VARCHAR,
     description TEXT, completed BOOLEAN, completed_at TIMESTAMPTZ
 ) AS $$
 BEGIN
-    -- Verifica que el goal pertenezca al usuario
-    IF NOT EXISTS (SELECT 1 FROM goals WHERE id = p_goal_id AND user_id = p_user_id) THEN
+    IF NOT EXISTS (SELECT 1 FROM goals g WHERE g.id = p_goal_id AND g.user_id = p_user_id) THEN
         RETURN;
     END IF;
-
     RETURN QUERY
     SELECT s.id, s.goal_id, s."order", s.title, s.description, s.completed, s.completed_at
     FROM steps s
@@ -172,7 +183,7 @@ END;
 $$ LANGUAGE plpgsql;
 
 
--- ── Videos ─────────────────────────────────────────────────────────────────
+-- ── Stored Procedures — Videos ────────────────────────────────────────────────
 
 CREATE OR REPLACE FUNCTION sp_save_video(
     p_step_id INT, p_video_id VARCHAR, p_title TEXT,
@@ -187,7 +198,6 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
-
 CREATE OR REPLACE FUNCTION sp_get_videos_by_step(p_step_id INT)
 RETURNS TABLE(id INT, step_id INT, video_id VARCHAR, title TEXT, thumbnail TEXT, url TEXT, channel VARCHAR) AS $$
 BEGIN
@@ -199,7 +209,7 @@ END;
 $$ LANGUAGE plpgsql;
 
 
--- ── Logros ─────────────────────────────────────────────────────────────────
+-- ── Stored Procedures — Logros ────────────────────────────────────────────────
 
 CREATE OR REPLACE FUNCTION sp_create_logro(
     p_goal_id INT, p_name VARCHAR, p_description TEXT, p_icon VARCHAR
@@ -212,7 +222,6 @@ BEGIN
     RETURNING logros.id;
 END;
 $$ LANGUAGE plpgsql;
-
 
 CREATE OR REPLACE FUNCTION sp_get_logros_by_goal(p_goal_id INT)
 RETURNS TABLE(
@@ -227,7 +236,6 @@ BEGIN
     ORDER BY l.id;
 END;
 $$ LANGUAGE plpgsql;
-
 
 CREATE OR REPLACE FUNCTION sp_get_user_logros(p_user_id INT)
 RETURNS TABLE(
@@ -244,8 +252,6 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
-
--- Desbloquea logros según el % de avance del goal
 CREATE OR REPLACE FUNCTION sp_unlock_logro_if_eligible(p_goal_id INT, p_user_id INT)
 RETURNS TABLE(id INT, name VARCHAR, description TEXT, icon VARCHAR) AS $$
 DECLARE
@@ -253,31 +259,26 @@ DECLARE
     v_completed INT;
     v_pct       NUMERIC;
 BEGIN
-    SELECT COUNT(*) INTO v_total    FROM steps WHERE goal_id = p_goal_id;
+    SELECT COUNT(*) INTO v_total     FROM steps WHERE goal_id = p_goal_id;
     SELECT COUNT(*) INTO v_completed FROM steps WHERE goal_id = p_goal_id AND completed = TRUE;
-
     IF v_total = 0 THEN RETURN; END IF;
     v_pct := (v_completed::NUMERIC / v_total) * 100;
 
-    -- Lógica: 1er logro al 25%, 2do al 60%, 3ro al 100%
     IF v_pct >= 25 THEN
         UPDATE logros SET unlocked = TRUE, unlocked_at = NOW()
         WHERE goal_id = p_goal_id AND unlocked = FALSE
           AND id = (SELECT MIN(id) FROM logros WHERE goal_id = p_goal_id AND unlocked = FALSE);
     END IF;
-
     IF v_pct >= 60 THEN
         UPDATE logros SET unlocked = TRUE, unlocked_at = NOW()
         WHERE goal_id = p_goal_id AND unlocked = FALSE
           AND id = (SELECT MIN(id) FROM logros WHERE goal_id = p_goal_id AND unlocked = FALSE);
     END IF;
-
     IF v_pct >= 100 THEN
         UPDATE logros SET unlocked = TRUE, unlocked_at = NOW()
         WHERE goal_id = p_goal_id AND unlocked = FALSE;
     END IF;
 
-    -- Devuelve logros recién desbloqueados en esta llamada
     RETURN QUERY
     SELECT l.id, l.name, l.description, l.icon
     FROM logros l
@@ -288,21 +289,19 @@ END;
 $$ LANGUAGE plpgsql;
 
 
--- ── User Progress ──────────────────────────────────────────────────────────
+-- ── Stored Procedures — Progress ──────────────────────────────────────────────
 
 CREATE OR REPLACE FUNCTION sp_complete_step(p_step_id INT, p_user_id INT)
 RETURNS TABLE(step_id INT, completed BOOLEAN, already_completed BOOLEAN) AS $$
 DECLARE
     v_already BOOLEAN := FALSE;
 BEGIN
-    -- ¿Ya estaba completado?
     SELECT TRUE INTO v_already FROM user_progress
     WHERE user_progress.step_id = p_step_id AND user_id = p_user_id;
 
     IF NOT FOUND THEN
         INSERT INTO user_progress (user_id, step_id) VALUES (p_user_id, p_step_id)
         ON CONFLICT DO NOTHING;
-
         UPDATE steps SET completed = TRUE, completed_at = NOW()
         WHERE id = p_step_id;
     END IF;
@@ -311,7 +310,6 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
-
 CREATE OR REPLACE FUNCTION sp_get_user_progress(p_user_id INT, p_goal_id INT)
 RETURNS TABLE(
     goal_id INT, total_steps BIGINT, completed_steps BIGINT,
@@ -319,8 +317,7 @@ RETURNS TABLE(
 ) AS $$
 BEGIN
     RETURN QUERY
-    SELECT
-        p_goal_id,
+    SELECT p_goal_id,
         COUNT(s.id),
         COUNT(s.id) FILTER (WHERE s.completed = TRUE),
         CASE WHEN COUNT(s.id) = 0 THEN 0
@@ -334,7 +331,7 @@ END;
 $$ LANGUAGE plpgsql;
 
 
--- ── Video Views ────────────────────────────────────────────────────────────
+-- ── Stored Procedures — Video Views ──────────────────────────────────────────
 
 CREATE OR REPLACE FUNCTION sp_register_video_view(p_user_id INT, p_video_id INT, p_step_id INT)
 RETURNS TABLE(view_id INT, already_viewed BOOLEAN) AS $$
@@ -357,22 +354,21 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
-
 CREATE OR REPLACE FUNCTION sp_get_viewed_videos(p_user_id INT, p_goal_id INT)
 RETURNS TABLE(video_id INT, title TEXT, step_id INT, viewed_at TIMESTAMPTZ) AS $$
 BEGIN
     RETURN QUERY
     SELECT vv.video_id, v.title, vv.step_id, vv.viewed_at
     FROM video_views vv
-    JOIN videos v  ON v.id   = vv.video_id
-    JOIN steps  s  ON s.id   = vv.step_id
+    JOIN videos v ON v.id = vv.video_id
+    JOIN steps  s ON s.id = vv.step_id
     WHERE vv.user_id = p_user_id AND s.goal_id = p_goal_id
     ORDER BY vv.viewed_at DESC;
 END;
 $$ LANGUAGE plpgsql;
 
 
--- ── Streaks ────────────────────────────────────────────────────────────────
+-- ── Stored Procedures — Streaks ───────────────────────────────────────────────
 
 CREATE OR REPLACE FUNCTION sp_update_streak(p_user_id INT)
 RETURNS TABLE(current_streak INT, longest_streak INT, last_activity DATE) AS $$
@@ -394,19 +390,15 @@ BEGIN
     END IF;
 
     IF v_last_activity = v_today THEN
-        -- Ya hubo actividad hoy, no cambiar
         RETURN QUERY SELECT v_current, v_longest, v_last_activity;
         RETURN;
     ELSIF v_last_activity = v_today - INTERVAL '1 day' THEN
-        -- Día consecutivo
         v_current := v_current + 1;
     ELSE
-        -- Rompió el streak
         v_current := 1;
     END IF;
 
     v_longest := GREATEST(v_current, v_longest);
-
     UPDATE streaks
     SET current_streak = v_current, longest_streak = v_longest, last_activity = v_today
     WHERE user_id = p_user_id;
@@ -414,7 +406,6 @@ BEGIN
     RETURN QUERY SELECT v_current, v_longest, v_today;
 END;
 $$ LANGUAGE plpgsql;
-
 
 CREATE OR REPLACE FUNCTION sp_get_streak(p_user_id INT)
 RETURNS TABLE(current_streak INT, longest_streak INT, last_activity DATE) AS $$

@@ -9,11 +9,11 @@ const headers = () => ({
 })
 
 // ── Auth ──────────────────────────────────────────────────────────────────────
-export const apiLogin = (username: string, password: string) =>
+export const apiLogin = (email: string, password: string) =>
   fetch(`${BASE}/auth/login/`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ username, password }),
+    body: JSON.stringify({ email, password }),
   }).then(r => r.json())
 
 export const apiRegister = (username: string, email: string, password: string, passwordConfirm: string) =>
@@ -39,6 +39,12 @@ export const apiCreateGoal = (goal_text: string) =>
 
 export const apiGetGoal = (id: number) =>
   fetch(`${BASE}/goals/${id}/`, { headers: headers() }).then(r => r.json())
+
+export const apiDeleteGoal = (id: number) =>
+  fetch(`${BASE}/goals/${id}/delete/`, {
+    method: 'DELETE',
+    headers: headers(),
+  }).then(r => r.json())
 
 // ── Progress ──────────────────────────────────────────────────────────────────
 export const apiCompleteStep = (stepId: number, goalId: number) =>
