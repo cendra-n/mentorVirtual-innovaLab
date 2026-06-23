@@ -16,11 +16,11 @@ export const apiLogin = (email: string, password: string) =>
     body: JSON.stringify({ email, password }),
   }).then(r => r.json())
 
-export const apiRegister = (username: string, email: string, password: string) =>
+export const apiRegister = (username: string, email: string, password: string, passwordConfirm: string) =>
   fetch(`${BASE}/auth/register/`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ username, email, password }),
+    body: JSON.stringify({ username, email, password, password_confirm: passwordConfirm }),
   }).then(r => r.json())
 
 export const apiMe = () =>

@@ -20,14 +20,19 @@ export default function Login({ onLogin }: Props) {
   const mentorName = import.meta.env.VITE_MENTOR_NAME || 'Pulso'
 
   const validate = () => {
-    if (!email.trim())                    return 'El email es obligatorio.'
-    if (!/\S+@\S+\.\S+/.test(email))     return 'El email no es válido.'
-    if (password.length < 8)             return 'La contraseña debe tener al menos 8 caracteres.'
+    if (!email.trim()) return 'El email es obligatorio.'
+    if (!/\S+@\S+\.\S+/.test(email)) return 'El email no es válido.'
+    if (password.length < 8) return 'La contraseña debe tener al menos 8 caracteres.'
     if (mode === 'register') {
-      if (!username.trim())              return 'El nombre de usuario es obligatorio.'
-      if (password !== confirm)          return 'Las contraseñas no coinciden.'
+      if (!username.trim()) return 'El nombre de usuario es obligatorio.'
+      if (password !== confirm) return 'Las contraseñas no coinciden.'
     }
     return null
+  }
+
+  const handleBlur = () => {
+    const err = validate()
+    setError(err || '')
   }
 
   const handleSubmit = async () => {
@@ -38,8 +43,8 @@ export default function Login({ onLogin }: Props) {
     setLoading(true)
     try {
       const res = mode === 'login'
-        ? await apiLogin(email, password)
-        : await apiRegister(username, email, password)
+      ? await apiLogin(email, password)
+      : await apiRegister(username, email, password, confirm)
 
       if (res.access) {
         onLogin(res.access, res.refresh)
@@ -108,6 +113,7 @@ export default function Login({ onLogin }: Props) {
               value={email}
               onChange={e => setEmail(e.target.value)}
               onKeyDown={e => e.key === 'Enter' && mode === 'login' && handleSubmit()}
+              onBlur={handleBlur}
               autoComplete="email"
             />
 
@@ -120,6 +126,7 @@ export default function Login({ onLogin }: Props) {
                   placeholder="Tu nombre de usuario"
                   value={username}
                   onChange={e => setUsername(e.target.value)}
+                  onBlur={handleBlur}
                   autoComplete="username"
                 />
               </>
@@ -134,6 +141,7 @@ export default function Login({ onLogin }: Props) {
                 value={password}
                 onChange={e => setPassword(e.target.value)}
                 onKeyDown={e => e.key === 'Enter' && mode === 'login' && handleSubmit()}
+                onBlur={handleBlur}
                 autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
               />
               <button className="toggle-pass" onClick={() => setShowPass(!showPass)} tabIndex={-1}>
@@ -152,6 +160,7 @@ export default function Login({ onLogin }: Props) {
                     value={confirm}
                     onChange={e => setConfirm(e.target.value)}
                     onKeyDown={e => e.key === 'Enter' && handleSubmit()}
+                    onBlur={handleBlur}
                     autoComplete="new-password"
                   />
                   {confirm && (
@@ -199,5 +208,6 @@ function getStrength(pass: string): number {
 }
 
 function getStrengthLabel(pass: string): string {
-  return ['', 'Débil', 'Regular', 'Buena', 'Fuerte'][getStrength(pass)]
+  const s = getStrength(pass)
+  return ['', 'Débil', 'Regular', 'Buena', 'Fuerte'][s]
 }
