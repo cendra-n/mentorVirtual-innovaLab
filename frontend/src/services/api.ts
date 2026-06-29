@@ -55,6 +55,19 @@ export const apiRegister = (
     body: JSON.stringify({ username, email, password, password_confirm: passwordConfirm }),
   }).then(async r => ({ ok: r.ok, status: r.status, data: await r.json() }))
 
+export const apiUpdateStudentProfile = (
+  accessToken: string,
+  data: { fecha_nacimiento?: string; genero?: string }
+): Promise<ApiResult> =>
+  fetch(`${BASE}/auth/profile/student/update/`, {
+    method: 'PATCH',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${accessToken}`,
+    },
+    body: JSON.stringify(data),
+  }).then(async r => ({ ok: r.ok, status: r.status, data: await r.json() }))
+
 export const apiMe = () =>
   fetch(`${BASE}/auth/me/`, { headers: headers() }).then(r => r.json())
 

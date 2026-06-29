@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { apiLogin, apiRegister, parseFieldErrors } from '../services/api'
+import { apiLogin, apiRegister, parseFieldErrors, apiUpdateStudentProfile } from '../services/api'
 import avatarFem from '../assets/avatar-femenino.svg'
 import avatarMasc from '../assets/avatar-masculino.svg'
 import avatarNoDecir from '../assets/avatar-prefiero-no-decir.svg'
@@ -15,12 +15,24 @@ type Genero = 'F' | 'M' | 'ND'
 
 function getPasswordChecks(pass: string) {
   return {
-    length: pass.length >= 8,
+    number: /[0-9]/.test(pass),
     upper: /[A-Z]/.test(pass),
     lower: /[a-z]/.test(pass),
-    number: /[0-9]/.test(pass),
     special: /[^A-Za-z0-9]/.test(pass),
+    length: pass.length >= 8,
   }
+}
+
+// Calcula la edad exacta a partir de una fecha en formato YYYY-MM-DD (el que da <input type="date">)
+function calcularEdad(fechaISO: string): number {
+  const hoy = new Date()
+  const nacimiento = new Date(fechaISO)
+  let edad = hoy.getFullYear() - nacimiento.getFullYear()
+  const aunNoCumplio =
+    hoy.getMonth() < nacimiento.getMonth() ||
+    (hoy.getMonth() === nacimiento.getMonth() && hoy.getDate() < nacimiento.getDate())
+  if (aunNoCumplio) edad--
+  return edad
 }
 
 // ── Íconos (SVG inline, sin librerías externas) ─────────────────────────────────
@@ -151,26 +163,41 @@ function AuthHeader({ mode, switchMode }: { mode: 'login' | 'register'; switchMo
   )
 }
 
+// ── Tarjeta de selección de género ──────────────────────────────────────────────
+function GeneroCard({ active, label, avatar, onClick }: { active: boolean; label: string; avatar: string; onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      className={`genero-card ${active ? 'genero-card--active' : ''}`}
+      onClick={onClick}
+      aria-label={label}
+      aria-pressed={active}
+    >
+      <img src={avatar} alt="" className="genero-card-avatar" />
+      <span className="genero-card-label">{label}</span>
+    </button>
+  )
+}
+
 export default function Login({ onLogin }: Props) {
-  const [mode, setMode]                 = useState<'login' | 'register'>('login')
-  const [email, setEmail]               = useState('')
-  const [username, setUsername]         = useState('')
+  const [mode, setMode] = useState<'login' | 'register'>('login')
+  const [email, setEmail] = useState('')
+  const [username, setUsername] = useState('')
   const [fechaNacimiento, setFechaNacimiento] = useState('')
-  const [genero, setGenero]             = useState<Genero | ''>('')
-  const [password, setPassword]         = useState('')
-  const [confirm, setConfirm]           = useState('')
+  const [genero, setGenero] = useState<Genero | ''>('')
+  const [password, setPassword] = useState('')
+  const [confirm, setConfirm] = useState('')
   const [aceptaTerminos, setAceptaTerminos] = useState(false)
-  const [fieldErrors, setFieldErrors]   = useState<FieldErrors>({})
+  const [fieldErrors, setFieldErrors] = useState<FieldErrors>({})
   const [generalError, setGeneralError] = useState('')
-  const [loading, setLoading]           = useState(false)
-  const [showPass, setShowPass]         = useState(false)
-  const [showConfirm, setShowConfirm]   = useState(false)
+  const [loading, setLoading] = useState(false)
+  const [showPass, setShowPass] = useState(false)
+  const [showConfirm, setShowConfirm] = useState(false)
   const [forgotClicked, setForgotClicked] = useState(false)
 
   const mentorName = import.meta.env.VITE_MENTOR_NAME || 'pulso'
 
-  // La validación completa por campo la armamos en la Parte 2 (registro);
-  // por ahora el login mantiene la lógica simple que ya tenía.
+  // ── Validación de login ────────────────────────────────────────────────────
   const validateLogin = (): FieldErrors => {
     const errors: FieldErrors = {}
     if (!email.trim()) errors.email = 'El email es obligatorio.'
@@ -180,6 +207,73 @@ export default function Login({ onLogin }: Props) {
     return errors
   }
 
+  // ── Validación de registro, campo por campo ────────────────────────────────
+  const validateField = (field: Field): string | undefined => {
+    switch (field) {
+      case 'username':
+        if (!username.trim()) return 'El nombre de usuario es obligatorio.'
+        if (/\s/.test(username)) return 'El nombre de usuario no puede contener espacios.'
+        if (username.trim().length < 3) return 'Debe tener al menos 3 caracteres.'
+        if (!/^[A-Za-z0-9_]+$/.test(username)) return 'Solo letras, números y guion bajo.'
+        return undefined
+
+      case 'fechaNacimiento':
+        if (!fechaNacimiento) return 'La fecha de nacimiento es obligatoria.'
+        if (calcularEdad(fechaNacimiento) < 18) return 'Tenés que ser mayor de 18 años para registrarte.'
+        return undefined
+
+      case 'email':
+        if (!email.trim()) return 'El email es obligatorio.'
+        if (/\s/.test(email)) return 'El email no puede contener espacios.'
+        if (!/^\S+@\S+\.\S+$/.test(email)) return 'El email no es válido.'
+        return undefined
+
+      case 'genero':
+        if (!genero) return 'Elegí una opción.'
+        return undefined
+
+      case 'password': {
+        if (!password) return 'La contraseña es obligatoria.'
+        const c = getPasswordChecks(password)
+        if (!c.length) return 'Debe tener al menos 8 caracteres.'
+        if (!c.upper) return 'Debe incluir al menos una mayúscula.'
+        if (!c.lower) return 'Debe incluir al menos una minúscula.'
+        if (!c.number) return 'Debe incluir al menos un número.'
+        if (!c.special) return 'Debe incluir al menos un carácter especial.'
+        return undefined
+      }
+
+      case 'confirm':
+        if (!confirm) return 'Confirmá tu contraseña.'
+        if (confirm !== password) return 'Las contraseñas no coinciden.'
+        return undefined
+
+      case 'terminos':
+        if (!aceptaTerminos) return 'Tenés que aceptar los términos para continuar.'
+        return undefined
+    }
+  }
+
+  const validateAllRegister = (): FieldErrors => {
+    const fields: Field[] = ['username', 'fechaNacimiento', 'email', 'genero', 'password', 'confirm', 'terminos']
+    const errors: FieldErrors = {}
+    for (const f of fields) {
+      const err = validateField(f)
+      if (err) errors[f] = err
+    }
+    return errors
+  }
+
+  const handleBlur = (field: Field) => {
+    const err = validateField(field)
+    setFieldErrors(prev => ({ ...prev, [field]: err }))
+  }
+
+  const clearFieldError = (field: Field) => {
+    if (fieldErrors[field]) setFieldErrors(prev => ({ ...prev, [field]: undefined }))
+  }
+
+  // ── Submit de login ─────────────────────────────────────────────────────────
   const handleLoginSubmit = async () => {
     setGeneralError('')
     const errors = validateLogin()
@@ -207,6 +301,50 @@ export default function Login({ onLogin }: Props) {
     setLoading(false)
   }
 
+  // ── Submit de registro (flujo de 2 pasos: register + PATCH de perfil) ──────
+  const handleRegisterSubmit = async () => {
+    setGeneralError('')
+    const errors = validateAllRegister()
+    if (Object.keys(errors).length > 0) {
+      setFieldErrors(errors)
+      return
+    }
+    setFieldErrors({})
+    setLoading(true)
+    try {
+      const res = await apiRegister(username, email, password, confirm)
+      if (res.ok && res.data.access) {
+        try {
+          await apiUpdateStudentProfile(res.data.access, {
+            fecha_nacimiento: fechaNacimiento,
+            genero,
+          })
+        } catch {
+          // Si falla este segundo paso, no bloqueamos el acceso: la cuenta
+          // ya se creó bien. La persona puede completar fecha/género después
+          // desde su perfil. Solo lo dejamos registrado en consola.
+          console.warn('No se pudo guardar fecha de nacimiento/género; la cuenta se creó igual.')
+        }
+        onLogin(res.data.access, res.data.refresh)
+        return
+      }
+      const backendErrors = parseFieldErrors(res.data)
+      const mapped: FieldErrors = {}
+      if (backendErrors.email) mapped.email = backendErrors.email
+      if (backendErrors.username) mapped.username = backendErrors.username
+      if (backendErrors.password) mapped.password = backendErrors.password
+      if (backendErrors.password_confirm) mapped.confirm = backendErrors.password_confirm
+      if (Object.keys(mapped).length > 0) {
+        setFieldErrors(mapped)
+      } else {
+        setGeneralError(res.data.detail || res.data.message || 'Ocurrió un error, intentá de nuevo.')
+      }
+    } catch {
+      setGeneralError('No se pudo conectar al servidor.')
+    }
+    setLoading(false)
+  }
+
   const switchMode = (m: 'login' | 'register') => {
     setMode(m)
     setFieldErrors({})
@@ -214,6 +352,8 @@ export default function Login({ onLogin }: Props) {
     setPassword('')
     setConfirm('')
   }
+
+  const checks = getPasswordChecks(password)
 
   return (
     <div className="auth-page">
@@ -231,7 +371,7 @@ export default function Login({ onLogin }: Props) {
                 <div className="auth-input-wrap">
                   <span className="auth-input-icon"><MailIcon /></span>
                   <input
-                    className={`auth-input ${fieldErrors.email ? 'auth-input--error' : ''}`}
+                    className={`auth-input auth-input--with-toggle ${fieldErrors.password ? 'auth-input--error' : ''}`}
                     type="email"
                     placeholder="tucorreoelectrónico@gmail.com"
                     value={email}
@@ -258,17 +398,11 @@ export default function Login({ onLogin }: Props) {
                 </div>
                 {fieldErrors.password && <span className="form-error">⚠️ {fieldErrors.password}</span>}
 
-                <button
-                  type="button"
-                  className="auth-forgot-link"
-                  onClick={() => setForgotClicked(true)}
-                >
+                <button type="button" className="auth-forgot-link" onClick={() => setForgotClicked(true)}>
                   ¿Olvidaste tu contraseña?
                 </button>
                 {forgotClicked && (
-                  <span className="auth-forgot-note">
-                    Esta función va a estar disponible próximamente.
-                  </span>
+                  <span className="auth-forgot-note">Esta función va a estar disponible próximamente.</span>
                 )}
 
                 {generalError && <div className="form-error">⚠️ {generalError}</div>}
@@ -284,9 +418,139 @@ export default function Login({ onLogin }: Props) {
               </div>
             </>
           ) : (
-            <div className="auth-form">
-              <p>🚧 Pantalla de registro — la armamos en la Parte 2.</p>
-            </div>
+            <>
+              <div className="auth-icon-circle"><UserPlusIcon /></div>
+              <h2 className="auth-title">Crea tu cuenta</h2>
+              <p className="auth-subtitle">Únete a la plataforma líder en mentoría virtual y potencia tu carrera</p>
+
+              <div className="auth-form">
+                <label className={fieldErrors.username ? 'auth-label--error' : ''}>Ingresa un nombre de usuario</label>
+                <div className="auth-input-wrap">
+                  <span className="auth-input-icon"><UserIcon /></span>
+                  <input
+                    className={`auth-input auth-input--with-toggle ${fieldErrors.confirm ? 'auth-input--error' : ''}`}
+                    placeholder="Juan01"
+                    value={username}
+                    onChange={e => { setUsername(e.target.value); clearFieldError('username') }}
+                    onBlur={() => handleBlur('username')}
+                  />
+                </div>
+                {fieldErrors.username && <span className="form-error">⚠️ {fieldErrors.username}</span>}
+
+                <div className="auth-row">
+                  <div className="auth-col">
+                    <label>Fecha de nacimiento</label>
+                    <div className="auth-input-wrap">
+                      <span className="auth-input-icon"><CalendarIcon /></span>
+                      <input
+                        className={`auth-input ${fieldErrors.fechaNacimiento ? 'auth-input--error' : ''}`}
+                        type="date"
+                        value={fechaNacimiento}
+                        onChange={e => { setFechaNacimiento(e.target.value); clearFieldError('fechaNacimiento') }}
+                        onBlur={() => handleBlur('fechaNacimiento')}
+                      />
+                    </div>
+                    {fieldErrors.fechaNacimiento && <span className="form-error">⚠️ {fieldErrors.fechaNacimiento}</span>}
+                  </div>
+
+                  <div className="auth-col">
+                    <label className={fieldErrors.email ? 'auth-label--error' : ''}>Correo Electrónico</label>
+                    <div className="auth-input-wrap">
+                      <span className="auth-input-icon"><MailIcon /></span>
+                      <input
+                        className={`auth-input ${fieldErrors.email ? 'auth-input--error' : ''}`}
+                        type="email"
+                        placeholder="tucorreoelectrónico@gmail.com"
+                        value={email}
+                        onChange={e => { setEmail(e.target.value); clearFieldError('email') }}
+                        onBlur={() => handleBlur('email')}
+                      />
+                    </div>
+                    {fieldErrors.email && <span className="form-error">⚠️ {fieldErrors.email}</span>}
+                  </div>
+                </div>
+
+                <label className="auth-genero-label">Indique su género</label>
+                <div className="genero-group">
+                  <GeneroCard active={genero === 'F'} label="Femenino" avatar={avatarFem} onClick={() => { setGenero('F'); clearFieldError('genero') }} />
+                  <GeneroCard active={genero === 'M'} label="Masculino" avatar={avatarMasc} onClick={() => { setGenero('M'); clearFieldError('genero') }} />
+                  <GeneroCard active={genero === 'ND'} label="Prefiero no decir" avatar={avatarNoDecir} onClick={() => { setGenero('ND'); clearFieldError('genero') }} />
+                </div>
+                {fieldErrors.genero && <span className="form-error">⚠️ {fieldErrors.genero}</span>}
+
+                <div className="auth-row">
+                  <div className="auth-col">
+                    <label>Contraseña</label>
+                    <div className="auth-input-wrap">
+                      <span className="auth-input-icon"><LockIcon /></span>
+                      <input
+                        className={`auth-input auth-input--with-toggle ${fieldErrors.password ? 'auth-input--error' : ''}`} type={showPass ? 'text' : 'password'}
+                        placeholder="Ingrese su contraseña..."
+                        value={password}
+                        onChange={e => { setPassword(e.target.value); clearFieldError('password') }}
+                        onBlur={() => handleBlur('password')}
+                      />
+                      <button className="auth-input-toggle" onClick={() => setShowPass(!showPass)} tabIndex={-1}>
+                        {showPass ? <EyeOffIcon /> : <EyeIcon />}
+                      </button>
+                    </div>
+                    {fieldErrors.password && <span className="form-error">⚠️ {fieldErrors.password}</span>}
+                  </div>
+
+                  <div className="auth-col">
+                    <label>Confirma tu contraseña</label>
+                    <div className="auth-input-wrap">
+                      <span className="auth-input-icon"><LockIcon /></span>
+                      <input
+                        className={`auth-input ${fieldErrors.confirm ? 'auth-input--error' : ''}`}
+                        type={showConfirm ? 'text' : 'password'}
+                        placeholder="Ingrese su contraseña..."
+                        value={confirm}
+                        onChange={e => { setConfirm(e.target.value); clearFieldError('confirm') }}
+                        onBlur={() => handleBlur('confirm')}
+                      />
+                      <button className="auth-input-toggle" onClick={() => setShowConfirm(!showConfirm)} tabIndex={-1}>
+                        {showConfirm ? <EyeOffIcon /> : <EyeIcon />}
+                      </button>
+                    </div>
+                    {fieldErrors.confirm && <span className="form-error">⚠️ {fieldErrors.confirm}</span>}
+                  </div>
+                </div>
+
+                {password && (
+                  <ul className="pass-requirements-figma">
+                    <li className={checks.number ? 'req-ok' : ''}><CheckIcon /> Tiene un número</li>
+                    <li className={checks.upper ? 'req-ok' : ''}><CheckIcon /> Cuenta con al menos una letra mayúscula</li>
+                    <li className={checks.lower ? 'req-ok' : ''}><CheckIcon /> Cuenta con al menos una letra minúscula</li>
+                    <li className={checks.special ? 'req-ok' : ''}><CheckIcon /> Tiene un carácter especial (+,-,*,$,...)</li>
+                    <li className={checks.length ? 'req-ok' : ''}><CheckIcon /> Tiene 8 o más dígitos</li>
+                  </ul>
+                )}
+
+                <label className="auth-checkbox-row">
+                  <input
+                    type="checkbox"
+                    checked={aceptaTerminos}
+                    onChange={e => { setAceptaTerminos(e.target.checked); clearFieldError('terminos') }}
+                  />
+                  <span>
+                    Al registrarte, aceptas nuestros <a href="#"><strong>Términos de Servicio</strong></a> y la <a href="#"><strong>Política de Privacidad</strong></a>.
+                  </span>
+                </label>
+                {fieldErrors.terminos && <span className="form-error">⚠️ {fieldErrors.terminos}</span>}
+
+                {generalError && <div className="form-error">⚠️ {generalError}</div>}
+
+                <button className="btn-primary btn-full auth-submit-btn" onClick={handleRegisterSubmit} disabled={loading}>
+                  <RocketIcon /> {loading ? 'Un momento...' : 'Crear mi cuenta!'}
+                </button>
+
+                <div className="auth-divider">O REGÍSTRATE CON</div>
+                <button className="auth-google-btn" type="button">
+                  <GoogleIcon /> Google
+                </button>
+              </div>
+            </>
           )}
         </div>
       </div>
