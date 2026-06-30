@@ -24,7 +24,7 @@ export function parseFieldErrors(data: any): ApiFieldErrors {
   const result: ApiFieldErrors = {}
   if (!data || typeof data !== 'object') return result
   for (const key of Object.keys(data)) {
-    if (key === 'detail' || key === 'message') continue
+    if (key === 'detail' || key === 'message' || key === 'error') continue
     const value = data[key]
     if (Array.isArray(value) && value.length > 0) {
       result[key] = String(value[0])
