@@ -194,6 +194,7 @@ export default function Login({ onLogin }: Props) {
   const [showPass, setShowPass] = useState(false)
   const [showConfirm, setShowConfirm] = useState(false)
   const [forgotClicked, setForgotClicked] = useState(false)
+  const [googleClicked, setGoogleClicked] = useState(false)
 
   const mentorName = import.meta.env.VITE_MENTOR_NAME || 'pulso'
 
@@ -353,6 +354,7 @@ export default function Login({ onLogin }: Props) {
     setGeneralError('')
     setPassword('')
     setConfirm('')
+    setGoogleClicked(false)
   }
 
   const checks = getPasswordChecks(password)
@@ -414,9 +416,12 @@ export default function Login({ onLogin }: Props) {
                 </button>
 
                 <div className="auth-divider">O INICIA CON GOOGLE</div>
-                <button className="auth-google-btn" type="button">
+                <button className="auth-google-btn" type="button" onClick={() => setGoogleClicked(true)}>
                   <GoogleIcon /> Google
                 </button>
+                {googleClicked && (
+                  <span className="auth-forgot-note">Próximamente disponible.</span>
+                )}
               </div>
             </>
           ) : (
@@ -550,9 +555,12 @@ export default function Login({ onLogin }: Props) {
                 </button>
 
                 <div className="auth-divider">O REGÍSTRATE CON</div>
-                <button className="auth-google-btn" type="button">
+                <button className="auth-google-btn" type="button" onClick={() => setGoogleClicked(true)}>
                   <GoogleIcon /> Google
                 </button>
+                {googleClicked && (
+                  <span className="auth-forgot-note">Próximamente disponible.</span>
+                )}
               </div>
             </>
           )}
