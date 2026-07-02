@@ -25,7 +25,6 @@ export default function Dashboard({ onLogout }: Props) {
   const [selectedGoal, setSelectedGoal] = useState<number | null>(null)
   const [showAdmin, setShowAdmin]       = useState(false)
 
-  const appName    = import.meta.env.VITE_APP_NAME    || 'Mentor Virtual'
   const mentorName = import.meta.env.VITE_MENTOR_NAME || 'Pulso'
 
   const loadData = async () => {
@@ -58,7 +57,7 @@ export default function Dashboard({ onLogout }: Props) {
   const userRole = user?.role || 'STUDENT'
   const canDelete = userRole === 'ADMIN' || userRole === 'PROFESSOR' || user?.is_staff
 
-  const displayName = user?.first_name || user?.username || '...'
+  const displayName = user?.first_name || user?.username || 'Brenda'
 
   // Vista admin
   if (showAdmin) {
