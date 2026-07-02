@@ -8,20 +8,52 @@ const headers = () => ({
     : {}),
 })
 
+// ── Tipos para respuestas de auth ──────────────────────────────────────────────
+export interface ApiResult<T = any> {
+  ok: boolean
+  status: number
+  data: T
+}
+
+// Errores de Django vienen como { campo: ["mensaje1", "mensaje2"] } o { detail: "..." }
+export type ApiFieldErrors = Record<string, string>
+
+// Convierte la respuesta cruda de error de DRF en un objeto plano { campo: "mensaje" }
+// Ignora 'detail' y 'message', que son mensajes generales (no de un campo específico).
+export function parseFieldErrors(data: any): ApiFieldErrors {
+  const result: ApiFieldErrors = {}
+  if (!data || typeof data !== 'object') return result
+  for (const key of Object.keys(data)) {
+    if (key === 'detail' || key === 'message') continue
+    const value = data[key]
+    if (Array.isArray(value) && value.length > 0) {
+      result[key] = String(value[0])
+    } else if (typeof value === 'string') {
+      result[key] = value
+    }
+  }
+  return result
+}
+
 // ── Auth ──────────────────────────────────────────────────────────────────────
-export const apiLogin = (email: string, password: string) =>
+export const apiLogin = (email: string, password: string): Promise<ApiResult> =>
   fetch(`${BASE}/auth/login/`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ email, password }),
-  }).then(r => r.json())
+  }).then(async r => ({ ok: r.ok, status: r.status, data: await r.json() }))
 
-export const apiRegister = (username: string, email: string, password: string) =>
+export const apiRegister = (
+  username: string,
+  email: string,
+  password: string,
+  passwordConfirm: string
+): Promise<ApiResult> =>
   fetch(`${BASE}/auth/register/`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ username, email, password }),
-  }).then(r => r.json())
+    body: JSON.stringify({ username, email, password, password_confirm: passwordConfirm }),
+  }).then(async r => ({ ok: r.ok, status: r.status, data: await r.json() }))
 
 export const apiMe = () =>
   fetch(`${BASE}/auth/me/`, { headers: headers() }).then(r => r.json())

@@ -423,6 +423,45 @@ input, textarea { font-family: var(--ff); }
 .strength-4 { background: var(--verde); }
 .pass-strength-label { font-size: 11px; color: var(--gris-medio); width: 50px; }
 
+/* Checklist de requisitos de contraseña — cada uno se tilda a medida que se cumple */
+.pass-requirements {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 4px 0 10px;
+  padding: 10px 14px;
+  background: var(--gris-claro);
+  border-radius: var(--radius);
+}
+
+.pass-requirements li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12.5px;
+  color: var(--gris-medio);
+}
+
+.pass-requirements li::before {
+  content: '';
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--gris-borde);
+  flex-shrink: 0;
+  transition: background .2s;
+}
+
+.pass-requirements li.req-ok {
+  color: var(--marino);
+  font-weight: 600;
+}
+
+.pass-requirements li.req-ok::before {
+  background: var(--verde);
+}
+
 /* ── Admin Panel ─────────────────────────────────────────────────────────────  */
 .admin-panel { flex: 1; overflow-y: auto; display: flex; flex-direction: column; }
 .admin-header { background: white; border-bottom: 1px solid var(--gris-borde); padding: 20px 28px; }
