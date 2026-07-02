@@ -219,6 +219,8 @@ export default function Login({ onLogin }: Props) {
 
       case 'fechaNacimiento':
         if (!fechaNacimiento) return 'La fecha de nacimiento es obligatoria.'
+        if (new Date(fechaNacimiento).getFullYear() < 1900) return 'Ingresá una fecha válida (año mínimo 1900).'
+        if (new Date(fechaNacimiento).getFullYear() > new Date().getFullYear()) return 'Ingresá una fecha válida.'
         if (calcularEdad(fechaNacimiento) < 18) return 'Tenés que ser mayor de 18 años para registrarte.'
         return undefined
 
@@ -445,6 +447,8 @@ export default function Login({ onLogin }: Props) {
                       <input
                         className={`auth-input ${fieldErrors.fechaNacimiento ? 'auth-input--error' : ''}`}
                         type="date"
+                        max={new Date(new Date().setFullYear(new Date().getFullYear() - 18)).toISOString().split('T')[0]}
+                        min="1900-01-01"
                         value={fechaNacimiento}
                         onChange={e => { setFechaNacimiento(e.target.value); clearFieldError('fechaNacimiento') }}
                         onBlur={() => handleBlur('fechaNacimiento')}
