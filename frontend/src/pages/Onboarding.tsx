@@ -20,8 +20,8 @@ type Disponibilidad = 'baja' | 'media' | 'alta' | ''
 // TODO: backend debería actualizar EstadoLaboralEnum para incluir 'estudio'
 // y 'prefiero_no_decir'. Por ahora mapeamos así:
 const ESTADO_LABORAL_MAP: Record<string, EstadoLaboral> = {
-  'Trabajo':          'activo',
-  'Estudio':          'activo',      // TODO: mapeo provisional
+  'Trabajo': 'activo',
+  'Estudio': 'activo',      // TODO: mapeo provisional
   'Prefiero no decir': '',
 }
 
@@ -29,8 +29,8 @@ const ESTADO_LABORAL_MAP: Record<string, EstadoLaboral> = {
 // franjas horarias (mañana/tarde/noche). Por ahora mapeamos así:
 const DISPONIBILIDAD_MAP: Record<string, Disponibilidad> = {
   'Mañana': 'baja',    // TODO: mapeo provisional
-  'Tarde':  'media',   // TODO: mapeo provisional
-  'Noche':  'alta',    // TODO: mapeo provisional
+  'Tarde': 'media',   // TODO: mapeo provisional
+  'Noche': 'alta',    // TODO: mapeo provisional
 }
 
 // ── Iconos para los pasos ────────────────────────────────────────────────────
@@ -45,10 +45,11 @@ function CheckCircleIcon() {
 
 // ── Layout compartido de todos los pasos ────────────────────────────────────
 function OnboardingLayout({
-  paso, total, titulo, subtitulo, children, onNext, onBack, nextLabel = 'Siguiente →', nextDisabled = false, loading = false, hideHint = false
+  paso, total, titulo, subtitulo, children, onNext, onBack, onSkip,
+  nextLabel = 'Siguiente →', nextDisabled = false, loading = false, hideHint = false,
 }: {
   paso: number; total: number; titulo: string; subtitulo?: string
-  children: React.ReactNode; onNext: () => void; onBack?: () => void
+  children: React.ReactNode; onNext: () => void; onBack?: () => void; onSkip?: () => void
   nextLabel?: string; nextDisabled?: boolean; loading?: boolean; hideHint?: boolean
 }) {
   return (
@@ -92,6 +93,11 @@ function OnboardingLayout({
             >
               {loading ? 'Guardando...' : nextLabel}
             </button>
+            {onSkip && (
+              <button className="onboarding-btn-skip" onClick={onSkip}>
+                Omitir
+              </button>
+            )}
           </div>
         </div>
       </div>
@@ -128,33 +134,33 @@ const ESTADOS_LABORALES = ['Trabajo', 'Estudio', 'Prefiero no decir']
 
 // ── Paso 3: Nivel educativo ──────────────────────────────────────────────────
 const NIVELES_EDUCATIVOS: { label: string; value: NivelEducativo }[] = [
-  { label: 'Primaria incompleta',    value: 'primario_incompleto' },
-  { label: 'Primaria completa',      value: 'primario_completo' },
-  { label: 'Secundaria incompleta',  value: 'secundario_incompleto' },
-  { label: 'Secundaria completa',    value: 'secundario_completo' },
-  { label: 'Terciario incompleto',   value: 'terciario_incompleto' },
-  { label: 'Terciario completo',     value: 'terciario_completo' },
+  { label: 'Primaria incompleta', value: 'primario_incompleto' },
+  { label: 'Primaria completa', value: 'primario_completo' },
+  { label: 'Secundaria incompleta', value: 'secundario_incompleto' },
+  { label: 'Secundaria completa', value: 'secundario_completo' },
+  { label: 'Terciario incompleto', value: 'terciario_incompleto' },
+  { label: 'Terciario completo', value: 'terciario_completo' },
   { label: 'Actualmente curso en la uni', value: 'universitario_en_curso' },
-  { label: 'Universidad completa',   value: 'universitario_completo' },
-  { label: 'Prefiero no decir',      value: '' },
+  { label: 'Universidad completa', value: 'universitario_completo' },
+  { label: 'Prefiero no decir', value: '' },
 ]
 
 // ── Paso 4: Horarios ─────────────────────────────────────────────────────────
 const HORARIOS = [
-  { label: 'Mañana',  sub: '8:00 AM – 12:00 PM' },
-  { label: 'Tarde',   sub: '12:00 PM – 6:00 PM' },
-  { label: 'Noche',   sub: '6:00 PM – 11:00 PM' },
+  { label: 'Mañana', sub: '8:00 AM – 12:00 PM' },
+  { label: 'Tarde', sub: '12:00 PM – 6:00 PM' },
+  { label: 'Noche', sub: '6:00 PM – 11:00 PM' },
 ]
 
 // ── Componente principal ─────────────────────────────────────────────────────
 export default function Onboarding({ accessToken, onComplete }: Props) {
-  const [paso, setPaso]                   = useState(1)
-  const [intereses, setIntereses]         = useState<string[]>([])
+  const [paso, setPaso] = useState(1)
+  const [intereses, setIntereses] = useState<string[]>([])
   const [estadoLaboral, setEstadoLaboral] = useState<string>('')
   const [nivelEducativo, setNivelEducativo] = useState<NivelEducativo>('')
-  const [horario, setHorario]             = useState<string>('')
+  const [horario, setHorario] = useState<string>('')
   const [recordatorios, setRecordatorios] = useState<boolean | null>(null)
-  const [loading, setLoading]             = useState(false)
+  const [loading, setLoading] = useState(false)
 
   const toggleInterés = (label: string) =>
     setIntereses(prev => prev.includes(label) ? prev.filter(i => i !== label) : [...prev, label])
@@ -226,7 +232,7 @@ export default function Onboarding({ accessToken, onComplete }: Props) {
       paso={1} total={6}
       titulo="¿Qué tipo de contenido te gustaría aprender?"
       subtitulo="Selecciona las categorías que más te interesan para personalizar tu experiencia."
-      onNext={siguiente} loading={loading}
+      onNext={siguiente} onSkip={siguiente} loading={loading}
     >
       <div className="onboarding-grid">
         {INTERESES.map(({ label, emoji }) => (
@@ -241,7 +247,7 @@ export default function Onboarding({ accessToken, onComplete }: Props) {
       paso={2} total={6}
       titulo="Cuéntanos un poco de ti..."
       subtitulo="Selecciona tu estado de empleabilidad actualmente, o si estás estudiando."
-      onNext={siguiente} onBack={atras} loading={loading}
+      onNext={siguiente} onBack={atras} onSkip={siguiente} loading={loading}
     >
       <div className="onboarding-grid onboarding-grid--3">
         {ESTADOS_LABORALES.map(label => (
@@ -256,7 +262,7 @@ export default function Onboarding({ accessToken, onComplete }: Props) {
       paso={3} total={6}
       titulo="¿Cuál es tu nivel educativo?"
       subtitulo="Selecciona el nivel más alto que alcanzaste."
-      onNext={siguiente} onBack={atras} loading={loading} hideHint
+      onNext={siguiente} onBack={atras} onSkip={siguiente} loading={loading}
     >
       <div className="onboarding-grid onboarding-grid--3">
         {NIVELES_EDUCATIVOS.map(({ label, value }) => (
@@ -290,13 +296,14 @@ export default function Onboarding({ accessToken, onComplete }: Props) {
   )
 
   if (paso === 5) return (
-    <OnboardingLayout
-      paso={5} total={6}
-      titulo="¿Deseas que te enviemos recordatorios de tus clases?"
-      subtitulo="Mantente al día con tus metas, ¡te notificaremos lo importante para alcanzarlas!"
-      onNext={siguiente} onBack={atras} loading={loading}
-      nextDisabled={recordatorios === null}
-    >
+  <OnboardingLayout
+    paso={5} total={6}
+    titulo="¿Deseas que te enviemos recordatorios de tus clases?"
+    subtitulo="Mantente al día con tus metas. Podés cambiarlo cuando quieras desde los ajustes."
+    onNext={siguiente} onBack={atras} loading={loading}
+    nextDisabled={recordatorios === null}
+    hideHint
+  >
       <div className="onboarding-recordatorios">
         <button
           type="button"

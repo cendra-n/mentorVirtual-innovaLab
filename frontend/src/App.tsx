@@ -10,7 +10,9 @@ export default function App() {
   const [screen, setScreen] = useState<Screen>(() => {
     // Si ya hay token guardado, va directo al dashboard
     // (el onboarding solo se muestra inmediatamente después de registrarse)
-    return localStorage.getItem('access_token') ? 'dashboard' : 'login'
+    if (!localStorage.getItem('access_token')) return 'login'
+    if (localStorage.getItem('onboarding_pending') === 'true') return 'onboarding'
+    return 'dashboard'
   })
   const [onboardingToken, setOnboardingToken] = useState<string | null>(null)
 
@@ -19,16 +21,16 @@ export default function App() {
     localStorage.setItem('refresh_token', refresh)
     setScreen('dashboard')
   }
-
   const handleRegisterSuccess = (access: string, refresh: string) => {
-    // Guardamos el token pero NO vamos al dashboard todavía
     localStorage.setItem('access_token', access)
     localStorage.setItem('refresh_token', refresh)
+    localStorage.setItem('onboarding_pending', 'true')
     setOnboardingToken(access)
     setScreen('onboarding')
   }
 
   const handleOnboardingComplete = () => {
+    localStorage.removeItem('onboarding_pending')
     setOnboardingToken(null)
     setScreen('dashboard')
   }

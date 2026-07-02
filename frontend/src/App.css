@@ -1214,3 +1214,13 @@ input, textarea { font-family: var(--ff); }
   .onboarding-grid { grid-template-columns: repeat(2, 1fr); }
   .onboarding-grid--3 { grid-template-columns: repeat(2, 1fr); }
 }
+
+.onboarding-btn-skip {
+  font-size: 12px;
+  color: var(--gris-medio);
+  font-weight: 500;
+  padding: 8px 16px;
+  border-radius: 50px;
+  transition: color .2s;
+}
+.onboarding-btn-skip:hover { color: var(--azul); }
