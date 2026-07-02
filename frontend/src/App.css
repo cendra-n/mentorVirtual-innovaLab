@@ -449,7 +449,7 @@ input, textarea { font-family: var(--ff); }
 /* ── Profile ─────────────────────────────────────────────────────────────────  */
 .profile-page { flex: 1; overflow-y: auto; }
 .profile-header { background: white; border-bottom: 1px solid var(--gris-borde); padding: 24px 28px; }
-.profile-body { padding: 24px 28px; display: flex; flex-direction: column; gap: 20px; max-width: 600px; }
+.profile-body { padding: 24px 28px; display: flex; flex-direction: column; gap: 20px; max-width: 800px; margin: 0 auto; }
 .profile-card { background: white; border: 1px solid var(--gris-borde); border-radius: var(--radius); padding: 24px; }
 .profile-avatar-row { display: flex; align-items: center; gap: 16px; margin-bottom: 20px; }
 .profile-avatar { width: 56px; height: 56px; border-radius: 50%; background: var(--marino); color: white; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 22px; flex-shrink: 0; }
@@ -644,3 +644,36 @@ input, textarea { font-family: var(--ff); }
 .goal-card-actions { display: flex; flex-direction: column; gap: 6px; align-items: flex-end; flex-shrink: 0; }
 .goal-delete-btn { background: #fee2e2; color: var(--rojo); border: 1px solid #fca5a5; padding: 6px 10px; border-radius: 50px; font-size: 13px; transition: all .2s; }
 .goal-delete-btn:hover { background: var(--rojo); color: white; }
+
+/* ── Profile stats ───────────────────────────────────────────────────────── */
+.profile-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  margin-top: 8px;
+}
+
+.profile-stat-box {
+  background: var(--gris-claro);
+  border-radius: var(--radius);
+  padding: 16px;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.profile-stat-value {
+  font-size: 28px;
+  font-weight: 800;
+  color: var(--azul);
+}
+
+.profile-stat-label {
+  font-size: 11px;
+  color: var(--gris-medio);
+}
+
+@media (max-width: 700px) {
+  .profile-stats-grid { grid-template-columns: repeat(2, 1fr); }
+}
