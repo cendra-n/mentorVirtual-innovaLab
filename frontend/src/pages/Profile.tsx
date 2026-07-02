@@ -12,28 +12,31 @@ const h = () => ({
 })
 
 export default function Profile({ user }: Props) {
-  const [current,    setCurrent]    = useState('')
-  const [newPass,    setNewPass]    = useState('')
-  const [confirm,    setConfirm]    = useState('')
-  const [msg,        setMsg]        = useState('')
-  const [loading,    setLoading]    = useState(false)
-  const [showPass,   setShowPass]   = useState(false)
-  const [profile,    setProfile]    = useState<any>(null)
+  const [current, setCurrent] = useState('')
+  const [newPass, setNewPass] = useState('')
+  const [confirm, setConfirm] = useState('')
+  const [msg, setMsg] = useState('')
+  const [loading, setLoading] = useState(false)
+  const [showPass, setShowPass] = useState(false)
+  const [profile, setProfile] = useState<any>(null)
+  const [avatarUrl, setAvatarUrl] = useState(user?.avatar_url || '')
+  const [avatarEdit, setAvatarEdit] = useState(false)
+  const [avatarMsg, setAvatarMsg] = useState('')
+
 
   const displayName = user?.first_name || user?.username || '...'
-
   useEffect(() => {
     fetch(`${BASE}/auth/profile/student/update/`, { headers: h() })
       .then(r => r.json())
       .then(setProfile)
-      .catch(() => {})
+      .catch(() => { })
   }, [])
 
   const handleChangePass = async () => {
     setMsg('')
-    if (!current)            { setMsg('❌ Ingresá tu contraseña actual.'); return }
-    if (newPass.length < 8)  { setMsg('❌ La nueva contraseña debe tener al menos 8 caracteres.'); return }
-    if (newPass !== confirm)  { setMsg('❌ Las contraseñas no coinciden.'); return }
+    if (!current) { setMsg('❌ Ingresá tu contraseña actual.'); return }
+    if (newPass.length < 8) { setMsg('❌ La nueva contraseña debe tener al menos 8 caracteres.'); return }
+    if (newPass !== confirm) { setMsg('❌ Las contraseñas no coinciden.'); return }
 
     setLoading(true)
     try {
@@ -42,7 +45,7 @@ export default function Profile({ user }: Props) {
         headers: h(),
         body: JSON.stringify({
           current_password: current,
-          new_password:     newPass,
+          new_password: newPass,
           confirm_password: confirm,
         }),
       }).then(r => r.json())
@@ -78,11 +81,25 @@ export default function Profile({ user }: Props) {
 
       <div className="profile-body">
 
-        {/* ── Tarjeta principal ── */}
+{/* ── Tarjeta principal ── */}
         <div className="profile-card">
           <div className="profile-avatar-row">
-            <div className="profile-avatar">
-              {displayName.charAt(0).toUpperCase()}
+            <div className="profile-avatar-wrap">
+              {avatarUrl ? (
+                <img
+                  src={avatarUrl}
+                  alt={displayName}
+                  className="profile-avatar-img"
+                  onError={e => { (e.target as HTMLImageElement).src = ''; setAvatarUrl('') }}
+                />
+              ) : (
+                <div className="profile-avatar">
+                  {displayName.charAt(0).toUpperCase()}
+                </div>
+              )}
+              <button className="profile-avatar-edit-btn" title="Cambiar foto" onClick={() => setAvatarEdit(!avatarEdit)}>
+                ✏️
+              </button>
             </div>
             <div>
               <h2 className="profile-name">{displayName}</h2>
@@ -92,6 +109,52 @@ export default function Profile({ user }: Props) {
             </div>
             <MentorBot mood="guiñando" size={56} className="profile-bot" />
           </div>
+
+          {avatarEdit && (
+            <div className="profile-avatar-edit">
+              <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--marino)', marginBottom: 4, display: 'block' }}>
+                URL de tu foto de perfil
+              </label>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <input
+                  className="form-input"
+                  type="url"
+                  autoComplete="off"
+                  placeholder="https://ejemplo.com/mi-foto.jpg"
+                  value={avatarUrl}
+                  onChange={e => setAvatarUrl(e.target.value)}
+                  style={{ flex: 1 }}
+                />
+                <button
+                  className="btn-primary"
+                  onClick={async () => {
+                    try {
+                      const res = await fetch(`${BASE}/auth/me/`, {
+                        method: 'PUT',
+                        headers: h(),
+                        body: JSON.stringify({
+                          email: user?.email,
+                          phone: user?.phone || '',
+                          avatar_url: avatarUrl,
+                        }),
+                      }).then(r => r.json())
+                      if (res.user) {
+                        setAvatarMsg('✅ Foto actualizada.')
+                        setAvatarEdit(false)
+                      } else {
+                        setAvatarMsg('❌ No se pudo guardar.')
+                      }
+                    } catch {
+                      setAvatarMsg('❌ No se pudo conectar.')
+                    }
+                  }}
+                >
+                  Guardar
+                </button>
+              </div>
+              {avatarMsg && <span style={{ fontSize: 12, color: 'var(--gris-medio)' }}>{avatarMsg}</span>}
+            </div>
+          )}
 
           <div className="profile-info-grid">
             <div className="profile-info-item">
@@ -201,7 +264,7 @@ export default function Profile({ user }: Props) {
             {newPass && (
               <div className="pass-strength">
                 <div className="pass-strength-bar">
-                  {[1,2,3,4].map(i => (
+                  {[1, 2, 3, 4].map(i => (
                     <div key={i} className={`pass-strength-seg ${strength(newPass) >= i ? `strength-${strength(newPass)}` : ''}`} />
                   ))}
                 </div>
