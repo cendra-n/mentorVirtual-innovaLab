@@ -16,14 +16,14 @@ import {
 interface Props { onLogout: () => void }
 
 export default function Dashboard({ onLogout }: Props) {
-  const [activePage, setActivePage]   = useState('inicio')
-  const [user, setUser]               = useState<any>(null)
-  const [goals, setGoals]             = useState<any[]>([])
-  const [streak, setStreak]           = useState<any>({ current_streak: 0, longest_streak: 0 })
-  const [showModal, setShowModal]     = useState(false)
+  const [activePage, setActivePage] = useState('inicio')
+  const [user, setUser] = useState<any>(null)
+  const [goals, setGoals] = useState<any[]>([])
+  const [streak, setStreak] = useState<any>({ current_streak: 0, longest_streak: 0 })
+  const [showModal, setShowModal] = useState(false)
   const [goalLoading, setGoalLoading] = useState(false)
   const [selectedGoal, setSelectedGoal] = useState<number | null>(null)
-  const [showAdmin, setShowAdmin]       = useState(false)
+  const [showAdmin, setShowAdmin] = useState(false)
 
   const mentorName = import.meta.env.VITE_MENTOR_NAME || 'Pulso'
 
@@ -120,85 +120,80 @@ export default function Dashboard({ onLogout }: Props) {
       />
 
       <main className="dashboard-main">
-        <header className="dash-header">
-          <div>
-            <h1 className="dash-greeting">¡Hola {displayName}! 👋</h1>
-            <p className="dash-sub">¿Qué te gustaría aprender hoy?</p>
-          </div>
-          <div className="dash-header-right">
-            <button className="icon-btn">🔔</button>
-            <div className="avatar-circle">{displayName.charAt(0).toUpperCase()}</div>
-          </div>
-        </header>
+        {activePage === 'perfil' && <Profile user={user} />}
+        {activePage === 'lecciones' && <TutorPage />}
+        {activePage !== 'perfil' && activePage !== 'lecciones' && <>
+          <header className="dash-header">
+            <div>
+              <h1 className="dash-greeting">¡Hola {displayName}! 👋</h1>
+              <p className="dash-sub">¿Qué te gustaría aprender hoy?</p>
+            </div>
+            <div className="dash-header-right">
+              <button className="icon-btn">🔔</button>
+              <div className="avatar-circle">{displayName.charAt(0).toUpperCase()}</div>
+            </div>
+          </header>
 
-        <div className="hero-banner">
-          <div className="hero-text">
-            <h2>Sigue aprendiendo a tu ritmo</h2>
-            <p>¿Listo para tu sesión de hoy?<br/>
-               Explorá los temas del día y avanzá cuando y donde quieras.</p>
-            <button className="btn-primary hero-btn" onClick={() => setShowModal(true)}>
-              🤖 Nueva meta de aprendizaje
-            </button>
+          <div className="hero-banner">
+            <div className="hero-text">
+              <h2>Sigue aprendiendo a tu ritmo</h2>
+              <p>¿Listo para tu sesión de hoy?<br />
+                Explorá los temas del día y avanzá cuando y donde quieras.</p>
+              <button className="btn-primary hero-btn" onClick={() => setShowModal(true)}>
+                🤖 Nueva meta de aprendizaje
+              </button>
+            </div>
+            <MentorBot mood="emocionado" size={120} className="hero-bot" />
           </div>
-          <MentorBot mood="emocionado" size={120} className="hero-bot" />
+
+          {goals.length > 0 && (
+            <section className="dash-section">
+              <div className="section-head">
+                <h3>Continuá donde lo dejaste</h3>
+                <button className="link-btn">Ver más →</button>
+              </div>
+              <div className="goals-list">
+                {goals.slice(0, 3).map(g => (
+                  <GoalCard
+                    key={g.id}
+                    goal={g}
+                    onClick={setSelectedGoal}
+                    onDelete={handleDeleteGoal}
+                    canDelete={canDelete}
+                  />
+                ))}
+              </div>
+            </section>
+          )}
+
+          {goals.length === 0 && (
+            <div className="empty-state">
+              <MentorBot mood="ayudando" size={80} />
+              <h3>¡Empezá tu primer plan!</h3>
+              <p>Contame qué querés aprender y {mentorName} te arma un camino personalizado.</p>
+              <button className="btn-primary" onClick={() => setShowModal(true)}>
+                ✨ Crear mi primer plan
+              </button>
+            </div>
+          )}
+        </>}</main>
+
+        <div className="dashboard-right">
+          <WeekStreak
+            currentStreak={streak.current_streak}
+            longestStreak={streak.longest_streak}
+            lastActivity={streak.last_activity}
+          />
+          <MentorChat />
         </div>
 
-        {goals.length > 0 && (
-          <section className="dash-section">
-            <div className="section-head">
-              <h3>Continuá donde lo dejaste</h3>
-              <button className="link-btn">Ver más →</button>
-            </div>
-            <div className="goals-list">
-              {goals.slice(0, 3).map(g => (
-                <GoalCard
-                  key={g.id}
-                  goal={g}
-                  onClick={setSelectedGoal}
-                  onDelete={handleDeleteGoal}
-                  canDelete={canDelete}
-                />
-              ))}
-            </div>
-          </section>
+        {showModal && (
+          <NewGoalModal
+            onSubmit={handleCreateGoal}
+            onClose={() => !goalLoading && setShowModal(false)}
+            loading={goalLoading}
+          />
         )}
-
-        {goals.length === 0 && (
-          <div className="empty-state">
-            <MentorBot mood="ayudando" size={80} />
-            <h3>¡Empezá tu primer plan!</h3>
-            <p>Contame qué querés aprender y {mentorName} te arma un camino personalizado.</p>
-            <button className="btn-primary" onClick={() => setShowModal(true)}>
-              ✨ Crear mi primer plan
-            </button>
-          </div>
-        )}
-
-        {activePage === 'perfil' && (
-          <Profile user={user} />
-        )}
-
-        {activePage === 'lecciones' && (
-          <TutorPage />
-        )}
-      </main>
-
-      <div className="dashboard-right">
-        <WeekStreak
-          currentStreak={streak.current_streak}
-          longestStreak={streak.longest_streak}
-          lastActivity={streak.last_activity}
-        />
-        <MentorChat />
-      </div>
-
-      {showModal && (
-        <NewGoalModal
-          onSubmit={handleCreateGoal}
-          onClose={() => !goalLoading && setShowModal(false)}
-          loading={goalLoading}
-        />
-      )}
     </div>
   )
 }
