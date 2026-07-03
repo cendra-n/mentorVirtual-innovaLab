@@ -20,7 +20,9 @@ export default function App() {
     setToken(null)
   }
 
-  return token
-    ? <Dashboard onLogout={handleLogout} />
-    : <Login onLogin={handleLogin} />
+if (!token) {
+  return <Login onLogin={handleLogin} />
+}
+
+return <Dashboard onLogout={handleLogout} />
 }
