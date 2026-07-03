@@ -24,7 +24,7 @@ export function parseFieldErrors(data: any): ApiFieldErrors {
   const result: ApiFieldErrors = {}
   if (!data || typeof data !== 'object') return result
   for (const key of Object.keys(data)) {
-    if (key === 'detail' || key === 'message') continue
+    if (key === 'detail' || key === 'message' || key === 'error') continue
     const value = data[key]
     if (Array.isArray(value) && value.length > 0) {
       result[key] = String(value[0])
@@ -53,6 +53,19 @@ export const apiRegister = (
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ username, email, password, password_confirm: passwordConfirm }),
+  }).then(async r => ({ ok: r.ok, status: r.status, data: await r.json() }))
+
+export const apiUpdateStudentProfile = (
+  accessToken: string,
+  data: { fecha_nacimiento?: string; genero?: string }
+): Promise<ApiResult> =>
+  fetch(`${BASE}/auth/profile/student/update/`, {
+    method: 'PATCH',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${accessToken}`,
+    },
+    body: JSON.stringify(data),
   }).then(async r => ({ ok: r.ok, status: r.status, data: await r.json() }))
 
 export const apiMe = () =>
