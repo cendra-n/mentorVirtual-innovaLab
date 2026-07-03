@@ -9,6 +9,7 @@ import GoalDetail from './GoalDetail'
 import AdminPanel from './AdminPanel'
 import Profile from './Profile'
 import TutorPage from './TutorPage'
+import ChatPage from './ChatPage'
 import {
   apiMe, apiGetGoals, apiCreateGoal, apiStreak, apiDeleteGoal
 } from '../services/api'
@@ -62,7 +63,7 @@ export default function Dashboard({ onLogout }: Props) {
   // Vista admin
   if (showAdmin) {
     return (
-      <div className="dashboard">
+      <div className={`dashboard ${activePage === 'chat' ? 'dashboard--chat-full' : ''}`}>
         <Sidebar
           active="admin"
           onNav={(p) => { setShowAdmin(false); setActivePage(p) }}
@@ -122,7 +123,8 @@ export default function Dashboard({ onLogout }: Props) {
       <main className="dashboard-main">
         {activePage === 'perfil' && <Profile user={user} />}
         {activePage === 'lecciones' && <TutorPage />}
-        {activePage !== 'perfil' && activePage !== 'lecciones' && <>
+        {activePage === 'chat' && <ChatPage />}
+        {activePage !== 'perfil' && activePage !== 'lecciones' && activePage !== 'chat' && <>
           <header className="dash-header">
             <div>
               <h1 className="dash-greeting">¡Hola {displayName}! 👋</h1>
@@ -178,6 +180,7 @@ export default function Dashboard({ onLogout }: Props) {
           )}
         </>}</main>
 
+      {activePage !== 'chat' && (
         <div className="dashboard-right">
           <WeekStreak
             currentStreak={streak.current_streak}
@@ -186,14 +189,15 @@ export default function Dashboard({ onLogout }: Props) {
           />
           <MentorChat />
         </div>
+      )}
 
-        {showModal && (
-          <NewGoalModal
-            onSubmit={handleCreateGoal}
-            onClose={() => !goalLoading && setShowModal(false)}
-            loading={goalLoading}
-          />
-        )}
+      {showModal && (
+        <NewGoalModal
+          onSubmit={handleCreateGoal}
+          onClose={() => !goalLoading && setShowModal(false)}
+          loading={goalLoading}
+        />
+      )}
     </div>
   )
 }
