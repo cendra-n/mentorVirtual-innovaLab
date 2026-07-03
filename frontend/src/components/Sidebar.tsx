@@ -10,15 +10,15 @@ interface Props {
 }
 
 const NAV = [
+  { id: 'chat',      icon: '🤖', label: 'Chatea con Pulso' },
   { id: 'inicio',    icon: '⌂', label: 'Inicio' },
-  { id: 'desafios',  icon: '🏆', label: 'Desafíos' },
   { id: 'lecciones', icon: '📖', label: 'Lecciones' },
+  { id: 'desafios',  icon: '🏆', label: 'Desafíos' },
   { id: 'logros',    icon: '⭐', label: 'Logros' },
   { id: 'perfil',    icon: '👤', label: 'Perfil' },
 ]
-
 export default function Sidebar({ active, onNav, user, streak, onLogout, onAdmin }: Props) {
-  const appName = import.meta.env.VITE_APP_NAME || 'Mentor Virtual'
+  const appName = import.meta.env.VITE_APP_NAME || 'Impulsa'
   const displayName = user?.first_name || user?.username || 'Usuario'
 
   return (
