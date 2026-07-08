@@ -208,38 +208,84 @@ Permite actualizar campos de perfil o configuraciones de accesibilidad. Soporta 
 
 ---
 
-### 6. Listar Usuarios
-Devuelve una lista con todos los usuarios registrados (con su perfil y configuración). Útil para vistas del equipo de trabajo.
+### 6. Listar Usuarios (Paginado)
+Retorna una lista paginada de todos los usuarios registrados en la plataforma, incluyendo su rol, perfil y su configuración de accesibilidad. Devuelve 10 registros por página.
 
-- **Ruta**: `/api/users/`
+> ⚠️ **Nota de Desarrollo / Pruebas en Swagger:**
+> Por defecto, cualquier usuario creado mediante el endpoint de `/api/register/` (o desde la interfaz de Swagger) se registra automáticamente con el rol de **STUDENT** (Alumno). Debido a esto, el sistema denegará el acceso a esta lista. Para poder probar este endpoint de forma exitosa, se debe iniciar sesión utilizando una cuenta con privilegios de **Staff/Admin** (creada previamente desde la terminal/shell de Docker).
+
+- **Ruta**: `/api/auth/users/`
 - **Método**: `GET`
-- **Autenticación**: Requerida (Token)
+- **Autenticación**: Requerida (Token) y Acceso restringido solo para miembros del Staff (`is_staff=True`).
+- **Parámetros de Consulta (Query Params)**:
+  - `page` (Opcional, Entero): Número de página a consultar. Por defecto es `1`.
+
 - **Respuesta Exitosa (200 OK)**:
   ```json
-  [
-    {
-      "id": 1,
-      "username": "admin",
-      "email": "admin@example.com",
-      "phone": "",
-      "avatar_url": "",
-      "config": {
-        "font_size": "MEDIUM",
-        "high_contrast": false,
-        "voice_guidance": false
+  {
+    "count": 5,
+    "total_pages": 1,
+    "next": null,
+    "previous": null,
+    "results": [
+      {
+        "id": 1,
+        "username": "nadiaAdmin",
+        "email": "nadiaAdmin@example.com",
+        "role": "STUDENT",
+        "phone": "",
+        "avatar_url": "",
+        "config": {
+          "font_size": "MEDIUM",
+          "high_contrast": false,
+          "voice_guidance": false
+        }
       }
-    },
-    {
-      "id": 5,
-      "username": "usuario_ejemplo",
-      "email": "nuevo_correo@correo.com",
-      "phone": "+56987654321",
-      "avatar_url": "https://url.com/nuevo_avatar.png",
-      "config": {
-        "font_size": "LARGE",
-        "high_contrast": true,
-        "voice_guidance": true
-      }
-    }
-  ]
-  ```
+    ]
+  }
+
+```
+
+* **Respuestas de Error Frecuentes**:
+* *Página vacía o fuera de rango (404 Not Found):*
+```json
+{
+  "detail": "Error página vacía, solo hay 1 páginas cargadas hasta el momento"
+}
+
+```
+
+* *Usuario Alumno / Sin privilegios de Staff (403 Forbidden):*
+```json
+{
+  "detail": "Las credenciales de autenticación no proveen privilegios de staff."
+}
+
+```
+
+---
+
+## ⚙️ Sistema de Paginación Personalizada (`pagination.py`)
+
+Para mantener respuestas estandarizadas y controlar la navegación en el Frontend, el backend utiliza una extensión del paginador nativo de Django REST Framework (`PageNumberPagination`).
+
+### Lógica de Funcionamiento:
+
+1. **Control de Páginas Vacías:** Si el cliente solicita una página que no posee registros (por ejemplo, escribir `?page=99` de forma manual), el método heredado de Django suele arrojar una excepción genérica. Nuestra clase intercepta este error y calcula en tiempo real mediante `math.ceil` cuántas páginas existen realmente basándose en el total de elementos del sistema, devolviendo un mensaje detallado al usuario.
+2. **Inyección de Metadatos:** Se calcula el total de páginas (`total_pages`) y se inyecta directamente en la raíz del cuerpo de la respuesta JSON junto con los enlaces tradicionales de navegación (`next` y `previous`).
+
+### Estructura Base de Respuesta Global Paginada
+
+Cualquier endpoint que implemente la clase `CustomPagination` adoptará la siguiente estructura de salida:
+
+* **Estructura del Cuerpo (JSON)**:
+```json
+{
+  "count": 0,           // Cantidad total de registros existentes en la base de datos
+  "total_pages": 1,     // Cantidad total de páginas disponibles basadas en bloques de 10
+  "next": null,         // URL de la siguiente página (String o null)
+  "previous": null,     // URL de la página anterior (String o null)
+  "results": []         // Array con los objetos de datos solicitados
+}
+
+```

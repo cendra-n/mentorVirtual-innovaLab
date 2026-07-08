@@ -44,6 +44,7 @@ INSTALLED_APPS = [
     'drf_spectacular',
     'users',
     'goals',
+    'courses',
     'progress',
 ]
 
@@ -219,3 +220,9 @@ CSRF_TRUSTED_ORIGINS = [
 ANTHROPIC_API_KEY = os.environ.get('ANTHROPIC_API_KEY', '')
 YOUTUBE_API_KEY   = os.environ.get('YOUTUBE_API_KEY', '')
 FRONTEND_URL      = os.environ.get('FRONTEND_URL', 'http://localhost:5173')
+MAX_COURSES_PER_PROFESSOR = int(os.environ.get("MAX_COURSES_PER_PROFESSOR", 2))
+
+# Media files
+MEDIA_URL = '/media/'
+MEDIA_ROOT = BASE_DIR / 'media'
+X_FRAME_OPTIONS = 'SAMEORIGIN'

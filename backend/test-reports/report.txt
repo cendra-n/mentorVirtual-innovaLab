@@ -1,0 +1,78 @@
+Found 20 test(s).
+Creating test database for alias 'default' ('test_MentorVirtual')...
+Operations to perform:
+  Synchronize unmigrated apps: adminpanel, corsheaders, drf_spectacular, goals, messages, progress, rest_framework, rest_framework_simplejwt, staticfiles, tutor
+  Apply all migrations: admin, auth, contenttypes, sessions, users
+Synchronizing apps without migrations:
+  Creating tables...
+    Running deferred SQL...
+Running migrations:
+  Applying contenttypes.0001_initial... OK
+  Applying auth.0001_initial... OK
+  Applying admin.0001_initial... OK
+  Applying admin.0002_logentry_remove_auto_add... OK
+  Applying admin.0003_logentry_add_action_flag_choices... OK
+  Applying contenttypes.0002_remove_content_type_name... OK
+  Applying auth.0002_alter_permission_name_max_length... OK
+  Applying auth.0003_alter_user_email_max_length... OK
+  Applying auth.0004_alter_user_username_opts... OK
+  Applying auth.0005_alter_user_last_login_null... OK
+  Applying auth.0006_require_contenttypes_0002... OK
+  Applying auth.0007_alter_validators_add_error_messages... OK
+  Applying auth.0008_alter_user_username_max_length... OK
+  Applying auth.0009_alter_user_last_name_max_length... OK
+  Applying auth.0010_alter_group_name_max_length... OK
+  Applying auth.0011_update_proxy_permissions... OK
+  Applying auth.0012_alter_user_first_name_max_length... OK
+  Applying sessions.0001_initial... OK
+  Applying users.0001_initial... OK
+  Applying users.0002_userprofile_role... OK
+  Applying users.0003_alter_userconfig_font_size_and_more... OK
+  Applying users.0004_alter_studentprofile_tiempo_acumulado_app_minutos_and_more... OK
+System check identified no issues (0 silenced).
+test_api_login_invalid_credentials (users.tests.UserEndpointsTestCase.test_api_login_invalid_credentials)
+Login falla con contraseña incorrecta. ... ok
+test_api_login_missing_fields (users.tests.UserEndpointsTestCase.test_api_login_missing_fields)
+Login falla si faltan campos obligatorios. ... ok
+test_api_login_success (users.tests.UserEndpointsTestCase.test_api_login_success)
+Login exitoso con email y password válidos. Devuelve JWT. ... ok
+test_api_logout_success (users.tests.UserEndpointsTestCase.test_api_logout_success)
+Logout invalida el refresh token enviado en el body. ... ok
+test_api_profile_get_success (users.tests.UserEndpointsTestCase.test_api_profile_get_success)
+GET del perfil devuelve datos del usuario autenticado. ... ok
+test_api_profile_unauthorized (users.tests.UserEndpointsTestCase.test_api_profile_unauthorized)
+El perfil requiere autenticación — devuelve 401 sin token. ... ok
+test_api_profile_update_duplicate_email_blocked (users.tests.UserEndpointsTestCase.test_api_profile_update_duplicate_email_blocked)
+El perfil no puede actualizarse con un email ya registrado por otro usuario. ... ok
+test_api_profile_update_patch_success (users.tests.UserEndpointsTestCase.test_api_profile_update_patch_success)
+PATCH actualiza solo los campos enviados, el resto no cambia. ... ok
+test_api_profile_update_put_success (users.tests.UserEndpointsTestCase.test_api_profile_update_put_success)
+PUT actualiza email, teléfono, avatar y config de accesibilidad. ... ok
+test_api_register_duplicate_email (users.tests.UserEndpointsTestCase.test_api_register_duplicate_email)
+El registro falla si el email ya está registrado. ... ok
+test_api_register_invalid_font_size (users.tests.UserEndpointsTestCase.test_api_register_invalid_font_size)
+El registro falla si font_size no es SMALL, MEDIUM o LARGE. ... ok
+test_api_register_invalid_phone (users.tests.UserEndpointsTestCase.test_api_register_invalid_phone)
+El registro falla si el teléfono tiene formato inválido. ... ok
+test_api_register_missing_fields (users.tests.UserEndpointsTestCase.test_api_register_missing_fields)
+El registro falla si faltan campos obligatorios. ... ok
+test_api_register_password_mismatch (users.tests.UserEndpointsTestCase.test_api_register_password_mismatch)
+El registro falla si password y password_confirm no coinciden. ... ok
+test_api_register_success (users.tests.UserEndpointsTestCase.test_api_register_success)
+Registro exitoso con todos los campos opcionales incluidos. ... ok
+test_api_register_weak_password (users.tests.UserEndpointsTestCase.test_api_register_weak_password)
+El registro falla si la contraseña no cumple requisitos OWASP. ... ok
+test_api_update_student_profile_read_only_fields (users.tests.UserEndpointsTestCase.test_api_update_student_profile_read_only_fields)
+Los campos de analítica marcados como read_only no deben poder ser modificados. ... ok
+test_api_update_student_profile_success (users.tests.UserEndpointsTestCase.test_api_update_student_profile_success)
+PATCH actualiza los campos demográficos y de intereses de StudentProfile. ... ok
+test_api_update_student_profile_unauthorized (users.tests.UserEndpointsTestCase.test_api_update_student_profile_unauthorized)
+El endpoint requiere autenticación — devuelve 401 sin token. ... ok
+test_api_users_list_success (users.tests.UserEndpointsTestCase.test_api_users_list_success)
+Solo staff puede listar usuarios. Devuelve respuesta paginada. ... ok
+
+----------------------------------------------------------------------
+Ran 20 tests in 12.778s
+
+OK
+Destroying test database for alias 'default' ('test_MentorVirtual')...

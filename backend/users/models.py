@@ -174,3 +174,58 @@ def save_user_profile_and_config(sender, instance, **kwargs):
     if hasattr(instance, 'student_analytics'):
         instance.student_analytics.save()
 # Campo agregado — requerido por migración 0002_userprofile_role
+
+# ── MODELO DE PROFESORES  ────────────────
+
+class ProfessorProfile(models.Model):
+    """
+    Perfil extendido exclusivo para los profesores del sistema.
+    Guarda la información contractual y laboral.
+    """
+    user = models.OneToOneField(
+        User, on_delete=models.CASCADE, related_name='professor_profile',
+        help_text='Usuario Django vinculado a este perfil docente.'
+    )
+    
+    # 🇦🇷 Validación estricta de 8 dígitos para el DNI argentino
+    from django.core.validators import RegexValidator
+    dni = models.CharField(
+        max_length=8,
+        unique=True,
+        validators=[RegexValidator(r'^\d{8}$', 'El DNI debe contener exactamente 8 números.')],
+        help_text="DNI del profesor (8 dígitos numéricos)"
+    )
+    
+    address = models.CharField(
+        max_length=255,
+        help_text="Dirección residencial completa"
+    )
+
+    birth_date = models.DateField(
+        null=True, 
+        blank=True, 
+        help_text="Fecha de nacimiento del docente"
+    )
+    
+    title_degree = models.CharField(
+        max_length=150,
+        blank=True,
+        null=True,
+        help_text="Título habilitante o especialización (Opcional)"
+    )
+    
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"Docente: {self.user.username} (DNI: {self.dni})"
+
+
+# ── Extensión del Modelo User mediante propiedades (Buenas Prácticas) ──
+
+@property
+def is_professor(self):
+    """Retorna True si el usuario tiene asignado el rol de profesor y tiene su perfil completo."""
+    return hasattr(self, 'profile') and self.profile.role == 'PROFESSOR'
+
+# Le inyectamos la propiedad dinámicamente al modelo User de Django
+User.add_to_class('is_professor', is_professor)

@@ -12,3 +12,5 @@ torch>=2.3
 pytest>=9.0
 pytest-django>=4.0
 pytest-html>=4.0
+reportlab>=5.0
+
