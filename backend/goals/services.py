@@ -51,7 +51,7 @@ def generate_plan_with_claude(goal_text: str) -> dict:
     import urllib.request, json as _json
 
     payload = _json.dumps({
-        "model": "claude-sonnet-4-20250514",
+        "model": "claude-fable-5",
         "max_tokens": 1024,
         "system": "Respondé siempre en español rioplatense. Sé empático, claro y motivador. Usá ejemplos de la vida cotidiana. Máximo 3 párrafos por respuesta.",
         "messages": [
@@ -73,7 +73,11 @@ def generate_plan_with_claude(goal_text: str) -> dict:
     with urllib.request.urlopen(req, timeout=30) as resp:
         data = _json.loads(resp.read())
 
-    raw_text = data["content"][0]["text"]
+    raw_text = ""
+    for block in data.get("content", []):
+        if block.get("type") == "text":
+            raw_text = block.get("text", "")
+            break
 
     # Limpiar posibles markdown fences
     raw_text = raw_text.strip()

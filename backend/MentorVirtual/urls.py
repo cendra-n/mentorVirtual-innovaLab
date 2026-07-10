@@ -15,11 +15,12 @@ urlpatterns = [
     path('api/auth/', include('users.urls')),
     path('api/auth/token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
 
-    # Goals, Progress, Admin, Tutor
+    # Goals, Progress, Admin, Tutor, Courses
     path('api/goals/',    include('goals.urls')),
     path('api/progress/', include('progress.urls')),
     path('api/admin/',    include('adminpanel.urls')),
     path('api/tutor/',    include('tutor.urls')),
+    path('api/courses/',    include('courses.urls')), #agregue courses
 
     # Documentación
     path('api/schema/',            SpectacularAPIView.as_view(),                          name='schema'),
@@ -30,6 +31,12 @@ urlpatterns = [
 
 from django.views.generic import RedirectView
 from django.conf import settings
+from django.conf.urls.static import static
+
 urlpatterns += [
     path('', RedirectView.as_view(url=settings.FRONTEND_URL)),
 ]
+
+if settings.DEBUG:
+    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+

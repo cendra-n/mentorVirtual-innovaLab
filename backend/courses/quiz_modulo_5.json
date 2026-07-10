@@ -1,0 +1,12 @@
+[
+  {
+    "question": "¿Cuál es el icono de WhatsApp?",
+    "options": [
+      "Un teléfono verde",
+      "Una F azul",
+      "Una cámara",
+      "Un pájaro"
+    ],
+    "correct_option_index": 0
+  }
+]

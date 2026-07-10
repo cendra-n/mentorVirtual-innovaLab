@@ -9,6 +9,7 @@ Combina:
 - api_profile con GET/PUT/PATCH
 - Paginación en listado de usuarios
 """
+import logging # <-- IMPORTANTE: Módulo para registrar los errores en el servidor
 from .serializers import StudentProfileSerializer
 from .models import StudentProfile
 from django.contrib.auth import authenticate
@@ -34,6 +35,9 @@ from .serializers import (
     UserDetailSerializer,
     LogoutResponseSerializer,
 )
+
+# Configuración del logger estándar para esta vista
+logger = logging.getLogger(__name__)
 
 
 # ── Helper JWT ────────────────────────────────────────────────────────────────
@@ -102,6 +106,7 @@ def api_login(request):
             'id':         user.id,
             'username':   user.username,
             'email':      user.email,
+            'role':       profile.role       if profile else 'STUDENT',
             'is_staff':   user.is_staff,
             'phone':      profile.phone      if profile else '',
             'avatar_url': profile.avatar_url if profile else '',
@@ -173,6 +178,7 @@ def api_register(request):
                 'id':         user.id,
                 'username':   user.username,
                 'email':      user.email,
+                'role':       profile.role       if profile else 'STUDENT',
                 'phone':      profile.phone,
                 'avatar_url': profile.avatar_url,
                 'config': {
@@ -184,7 +190,12 @@ def api_register(request):
         }, status=status.HTTP_201_CREATED)
 
     except Exception as e:
-        return Response({'error': f'Error al registrar el usuario: {str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        # Enzo Fix: Evitamos fugar estructuras de base de datos o fallas de señales
+        logger.error(f"Error interno durante el registro de usuario: {str(e)}", exc_info=True)
+        return Response(
+            {'error': 'Ha ocurrido un error interno en el servidor al procesar el registro.'}, 
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
 
 
 # ── Logout ────────────────────────────────────────────────────────────────────
@@ -241,6 +252,7 @@ def api_profile(request):
             'id':         user.id,
             'username':   user.username,
             'email':      user.email,
+            'role':       profile.role       if profile else 'STUDENT',
             'is_staff':   user.is_staff,
             'date_joined': user.date_joined,
             'phone':      profile.phone      if profile else '',
@@ -408,6 +420,8 @@ def api_update_student_profile(request):
     try:
         profile, created = StudentProfile.objects.get_or_create(user=request.user)
     except Exception as e:
+        # Registramos el error real en el servidor para debuggear, manteniendo la respuesta segura
+        logger.error(f"Fallo al acceder/crear StudentProfile: {str(e)}", exc_info=True)
         return Response({"detail": "Error al acceder al perfil."}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
     serializer = StudentProfileSerializer(profile, data=request.data, partial=True)
@@ -416,3 +430,5 @@ def api_update_student_profile(request):
         return Response(serializer.data, status=status.HTTP_200_OK)
     
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    
+ 

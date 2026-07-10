@@ -201,7 +201,7 @@ Respondé SOLO sobre este tema específico. Si no tenés certeza, decí "No teng
 
         try:
             payload = json.dumps({
-                "model": "claude-sonnet-4-20250514",
+                "model": "claude-fable-5",
                 "max_tokens": 400,
                 "system": TUTOR_SYSTEM,
                 "messages": [{"role": "user", "content": prompt}],
@@ -221,7 +221,11 @@ Respondé SOLO sobre este tema específico. Si no tenés certeza, decí "No teng
             with urllib.request.urlopen(req, timeout=30) as resp:
                 data = json.loads(resp.read())
 
-            answer = data["content"][0]["text"]
+            answer = ""
+            for block in data.get("content", []):
+                if block.get("type") == "text":
+                    answer = block.get("text", "")
+                    break
 
         except Exception as e:
             logger.error(f"Error Claude API en ask_step: {e}")
@@ -259,7 +263,7 @@ Respondé SOLO sobre este tema específico. Si no tenés certeza, decí "No teng
         # Llamar a Claude API
         try:
             payload = json.dumps({
-                "model": "claude-sonnet-4-20250514",
+                "model": "claude-fable-5",
                 "max_tokens": 512,
                 "system": TUTOR_SYSTEM,
                 "messages": [{"role": "user", "content": prompt}],
@@ -279,7 +283,11 @@ Respondé SOLO sobre este tema específico. Si no tenés certeza, decí "No teng
             with urllib.request.urlopen(req, timeout=30) as resp:
                 data = json.loads(resp.read())
 
-            answer = data["content"][0]["text"]
+            answer = ""
+            for block in data.get("content", []):
+                if block.get("type") == "text":
+                    answer = block.get("text", "")
+                    break
 
         except Exception as e:
             logger.error(f"Error Claude API en tutor: {e}")

@@ -2,6 +2,8 @@ from rest_framework import serializers
 from django.contrib.auth.models import User
 from django.core.validators import RegexValidator
 from .models import UserProfile, UserConfig, StudentProfile
+import re
+from datetime import date
 
 
 class UserConfigSerializer(serializers.ModelSerializer):
@@ -33,6 +35,24 @@ class UserDetailSerializer(serializers.ModelSerializer):
         if not hasattr(obj, 'config'):
             return {'font_size': 'MEDIUM', 'high_contrast': False, 'voice_guidance': False}
         return UserConfigSerializer(obj.config).data
+    
+    #Esto lo que hace es analizar los usuarios y los que tengan rol profesor, estan asi en la db : maria.lopez
+    #Con esta función lo que hacemos es que ponga un espacio y saque ese punto a nivel visual desde swagger
+    #Pero en la db no hay cambios queda maria.lopez , igualmente el usuario agregar nombre y apellido separado
+    #Y en la BD se guarda con el punto 
+    def to_representation(self, instance):
+        """
+        Filtro puramente estético de salida JSON. 
+        Reemplaza el punto por espacio SOLAMENTE si el rol es de profesor.
+        """
+        representation = super().to_representation(instance)
+        user_role = representation.get('role')
+        
+        if user_role == 'PROFESSOR' and 'username' in representation and representation['username']:
+            representation['username'] = representation['username'].replace('.', ' ')
+            
+        return representation
+
 
 class LoginRequestSerializer(serializers.Serializer):
     email = serializers.EmailField(
@@ -54,11 +74,13 @@ class LoginRequestSerializer(serializers.Serializer):
         help_text="Contraseña de la cuenta."
     )
 
+
 class LoginResponseSerializer(serializers.Serializer):
     message = serializers.CharField()
     refresh = serializers.CharField(help_text="Refresh token JWT.")
     access  = serializers.CharField(help_text="Access token JWT (Bearer).")
     user    = UserDetailSerializer()
+
 
 class RegisterRequestSerializer(serializers.Serializer):
     username = serializers.CharField(
@@ -170,6 +192,7 @@ class RegisterRequestSerializer(serializers.Serializer):
 
         return data
 
+
 class RegisterResponseSerializer(serializers.Serializer):
     message = serializers.CharField()
     refresh = serializers.CharField(help_text="Refresh token JWT.")
@@ -214,6 +237,7 @@ class ProfileUpdateSerializer(serializers.Serializer):
                 )
         return value
 
+
 class ProfileUpdateResponseSerializer(serializers.Serializer):
     message = serializers.CharField()
     user    = UserDetailSerializer()
@@ -223,7 +247,8 @@ class LogoutResponseSerializer(serializers.Serializer):
     message = serializers.CharField(
         help_text="Confirmación del cierre de sesión."
     )
-    
+
+
 class StudentProfileSerializer(serializers.ModelSerializer):
     class Meta:
         model = StudentProfile
@@ -265,13 +290,9 @@ class StudentProfileSerializer(serializers.ModelSerializer):
                 'help_text': 'Tiempo estimado disponible semanalmente (baja, media, alta).',
                 'required': False
             },
-            
             'zona_horaria': {
-                'read_only': True,
                 'label': 'Zona horaria',
-                'read_only': True, 
             },
-            
             'frecuencia_entradas': {
                 'read_only': True,
                 'min_value': 0,
@@ -308,3 +329,83 @@ class StudentProfileSerializer(serializers.ModelSerializer):
                 'min_value': 0
             },
         }
+
+#-----------professor--------------------------------------------
+class AdminCreateProfessorSerializer(serializers.Serializer):
+    username = serializers.CharField(
+        required=True, 
+        help_text="Nombre y apellido del profesor separado por un espacio (Ej: 'Juan Perez')."
+    )
+    email = serializers.EmailField(
+        required=True, 
+        help_text="Dirección de correo electrónico única."
+    )
+    password = serializers.CharField(
+        required=True, 
+        write_only=True, 
+        help_text="Mínimo 8 caracteres, una mayúscula, un número y un carácter especial."
+    )
+    
+    birth_date = serializers.DateField(
+        required=True,
+        input_formats=['%Y-%m-%d'],
+        help_text="Fecha de nacimiento del profesor (Formato YYYY-MM-DD). Debe tener entre 18 y 65 años."
+    )
+    dni = serializers.CharField(
+        required=True, 
+        max_length=8, 
+        min_length=8, 
+        help_text="DNI de exactamente 8 dígitos."
+    )
+    address = serializers.CharField(
+        required=True, 
+        help_text="Dirección residencial del profesor."
+    )
+    phone = serializers.CharField(required=False, allow_blank=True, default='')
+    avatar_url = serializers.CharField(required=False, allow_blank=True, default='')
+    title_degree = serializers.CharField(required=False, allow_blank=True, default='', help_text="Título (Opcional).")
+
+    def validate_username(self, value):
+        """
+        Validación de negocio estricta: El username debe ser 'Nombre Apellido' real.
+        - Debe contener obligatoriamente letras y espacios (no se permiten números ni símbolos).
+        - Debe incluir al menos un espacio intermedio para separar nombre de apellido.
+        - Internamente se normaliza reemplazando espacios por puntos para Django.
+        """
+        username = value.strip()
+
+        # 1. Verificar que tenga al menos un espacio intermedio
+        if ' ' not in username:
+            raise serializers.ValidationError(
+                "El nombre de usuario debe contener obligatoriamente Nombre y Apellido separados por un espacio."
+            )
+
+        # 2. Solo letras y espacios (bloquea números de forma estricta)
+        if not re.match(r'^[a-zA-ZáéíóúÁÉÍÓÚñÑüÜ\s]+$', username):
+            raise serializers.ValidationError(
+                "El nombre de un profesor solo puede contener letras y espacios. No se permiten números ni caracteres especiales."
+            )
+
+        # 3. Adaptación interna para Django
+        username_tecnico = username.replace(' ', '.').lower()
+
+        # 4. Evitamos duplicados devolviendo un 400 limpio
+        if User.objects.filter(username__iexact=username_tecnico).exists():
+            raise serializers.ValidationError(
+                "El nombre de usuario ya está registrado."
+            )
+
+        return username_tecnico
+
+    
+    def validate_birth_date(self, value):
+        today = date.today()
+        if value > today:
+            raise serializers.ValidationError("La fecha de nacimiento no puede ser una fecha en el futuro.")
+        
+        age = today.year - value.year - ((today.month, today.day) < (value.month, value.day))
+        if age < 18 or age > 65:
+            raise serializers.ValidationError(
+                f"El profesor debe tener entre 18 y 65 años de edad. Edad calculada: {age} años."
+            )
+        return value
