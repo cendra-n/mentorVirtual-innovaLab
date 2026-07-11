@@ -515,7 +515,7 @@ class CourseAPITests(APITestCase):
             discipline="it", objectives="obj", professor=self.professor_user, is_active=False
         )
         
-    #     self.client.force_authenticate(user=self.professor_user)
+        self.client.force_authenticate(user=self.professor_user)
         
         post_data = {
             "objetivo_curso": "Aprender a usar el celular para abuelos",
