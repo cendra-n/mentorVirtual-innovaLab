@@ -503,6 +503,8 @@ class CourseAPITests(APITestCase):
 
     def test_generate_course_with_ai_mvp_restriction(self):
         """ Valida que no se pueda generar un curso por IA si el profesor ya tiene 2 cursos """
+        from unittest.mock import patch
+
         # Creamos 2 cursos previos
         Course.objects.create(
             title="Curso Previo 1", description="Desc", level="beginner", 
@@ -521,8 +523,19 @@ class CourseAPITests(APITestCase):
             "generar_pdfs": True,
             "generar_cuestionarios": True
         }
+
+        mock_ai_response = {
+            "title": "Celulares para Abuelos",
+            "description": "Aprende a usar tu smartphone sin complicaciones.",
+            "level": "beginner",
+            "discipline": "Tecnología",
+            "objectives": "Aprender a mandar audios y llamadas.",
+            "modules": []
+        }
         
-        response = self.client.post(self.url_generar_ia, post_data, format='json')
+        with patch('courses.services.AnthropicService.generate_course_structure', return_value=mock_ai_response):
+            response = self.client.post(self.url_generar_ia, post_data, format='json')
+            
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertEqual(response.data["error"], "Un profesor solo puede tener un máximo de 2 cursos a la vez.")
 
