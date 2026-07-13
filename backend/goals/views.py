@@ -12,7 +12,7 @@ from .db import (
     sp_save_video, sp_get_videos_by_step, sp_create_logro,
     sp_get_logros_by_goal,
 )
-from .services import generate_plan_with_claude, search_youtube_video
+from .services import generate_plan_with_ai, search_youtube_video
 
 logger = logging.getLogger(__name__)
 
@@ -48,7 +48,7 @@ class GoalCreateView(APIView):
             return Response(_build_full_plan(existing, user_id))
 
         try:
-            plan = generate_plan_with_claude(goal_text)
+            plan = generate_plan_with_ai(goal_text)
         except Exception as exc:
             logger.error("Error Claude API: %s", exc)
             return Response({'error': 'No se pudo generar el plan. Intentá de nuevo.'}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
