@@ -13,6 +13,17 @@ class QuizQuestionSerializer(serializers.Serializer):
         help_text="Índice de la opción correcta (basado en 0)."
     )
 
+    def validate(self, data):
+        options = data.get('options', [])
+        if len(options) < 2:
+            raise serializers.ValidationError("Debe haber al menos 2 opciones de respuesta (una correcta y distractores).")
+        
+        correct_idx = data.get('correct_option_index')
+        if correct_idx is None or correct_idx < 0 or correct_idx >= len(options):
+            raise serializers.ValidationError("El índice de la opción correcta no es válido.")
+        
+        return data
+
 
 class ManualCourseSerializer(serializers.Serializer):
     """
@@ -154,6 +165,12 @@ class ModuleCreationSerializer(serializers.Serializer):
             raise serializers.ValidationError("El módulo debe contener al menos una lección.")
         return value
 
+    def validate_quiz(self, value):
+        if value:
+            if len(value) < 2:
+                raise serializers.ValidationError("El cuestionario debe contener al menos 2 preguntas.")
+        return value
+
 
 class CourseCreationSerializer(serializers.Serializer):
     id = serializers.IntegerField(read_only=True)
@@ -169,6 +186,12 @@ class CourseCreationSerializer(serializers.Serializer):
     objectives = serializers.CharField(required=False, allow_blank=True, default="", help_text="Objetivos.")
     cover_image = serializers.CharField(required=False, allow_blank=True, default="", help_text="URL de portada.")
     modules = ModuleCreationSerializer(many=True, required=False, default=list, help_text="Módulos del curso.")
+
+    def validate(self, data):
+        modules = data.get('modules', [])
+        if not modules:
+            raise serializers.ValidationError({"modules": "El curso debe contener al menos un módulo."})
+        return data
 
     def create(self, validated_data):
         from django.db import transaction

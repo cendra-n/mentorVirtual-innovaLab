@@ -27,6 +27,23 @@ from courses.db import MaxCoursesReached, CourseNotFound, PermissionDenied, Quiz
 logger = logging.getLogger(__name__)
 
 
+def get_first_error_message(errors):
+    if isinstance(errors, dict):
+        for val in errors.values():
+            msg = get_first_error_message(val)
+            if msg:
+                return msg
+    elif isinstance(errors, list):
+        for item in errors:
+            msg = get_first_error_message(item)
+            if msg:
+                return msg
+    elif isinstance(errors, str):
+        return errors
+    return None
+
+
+
 def draw_robot_logo():
     from reportlab.graphics.shapes import Drawing, Rect, Circle, Line
     # A small drawing of 40x45 pixels
@@ -230,24 +247,8 @@ def course_list_create(request):
 
         serializer = CourseCreationSerializer(data=request.data, context={'request': request})
         if not serializer.is_valid():
-            error_msg = None
-            for key, val in serializer.errors.items():
-                if isinstance(val, dict):
-                    for k2, v2 in val.items():
-                        if isinstance(v2, list) and len(v2) > 0:
-                            error_msg = v2[0]
-                            break
-                elif isinstance(val, list) and len(val) > 0:
-                    error_msg = val[0]
-                    break
-            if error_msg:
-                if isinstance(error_msg, dict):
-                    for k3, v3 in error_msg.items():
-                        if isinstance(v3, list) and len(v3) > 0:
-                            error_msg = v3[0]
-                            break
-                return Response({"error": str(error_msg)}, status=status.HTTP_400_BAD_REQUEST)
-            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+            error_msg = get_first_error_message(serializer.errors)
+            return Response({"error": error_msg or "Datos de entrada inválidos."}, status=status.HTTP_400_BAD_REQUEST)
 
         try:
             course_data = serializer.save()
@@ -640,6 +641,33 @@ def course_detail(request, course_id):
     elif request.method == 'DELETE':
         if user_role != 'ADMIN' and course['professor_id'] != user.id:
             return Response({"error": "No tienes permisos para eliminar este curso."}, status=status.HTTP_403_FORBIDDEN)
+
+        module_ids = []
+        with connection.cursor() as cur:
+            cur.execute("SELECT id FROM course_modules WHERE course_id = %s", [course_id])
+            module_ids = [row[0] for row in cur.fetchall()]
+
+        media_root = getattr(settings, 'MEDIA_ROOT', os.path.join(settings.BASE_DIR, 'media'))
+        courses_media_dir = os.path.join(media_root, 'courses')
+        
+        for m_id in module_ids:
+            # Eliminar PDF de lectura si existe
+            pdf_path = os.path.join(courses_media_dir, f"lectura_modulo_{m_id}.pdf")
+            if os.path.exists(pdf_path):
+                try:
+                    os.remove(pdf_path)
+                    logger.info(f"Archivo PDF eliminado: {pdf_path}")
+                except Exception as e:
+                    logger.error(f"No se pudo eliminar el archivo PDF {pdf_path}: {e}")
+
+            # Eliminar JSON del quiz si existe
+            quiz_path = os.path.join(courses_media_dir, f"quiz_modulo_{m_id}.json")
+            if os.path.exists(quiz_path):
+                try:
+                    os.remove(quiz_path)
+                    logger.info(f"Archivo JSON de quiz eliminado: {quiz_path}")
+                except Exception as e:
+                    logger.error(f"No se pudo eliminar el archivo JSON {quiz_path}: {e}")
 
         with connection.cursor() as cur:
             cur.execute("DELETE FROM courses WHERE id = %s", [course_id])

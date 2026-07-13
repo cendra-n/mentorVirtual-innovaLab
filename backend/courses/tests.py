@@ -921,3 +921,134 @@ class CourseAPITests(APITestCase):
             os.remove(pdf_path)
         if os.path.exists(quiz_path):
             os.remove(quiz_path)
+
+    def test_create_course_manual_validation_errors(self):
+        """ Valida que se lancen excepciones con mensajes específicos y claros para errores de validación estructurados """
+        self.client.force_authenticate(user=self.professor_user)
+        
+        # 1. Falta módulo
+        payload_no_modules = {
+            **self.valid_course_data,
+            "modules": []
+        }
+        response = self.client.post(self.url_crear_manual, payload_no_modules, format='json')
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("El curso debe contener al menos un módulo", response.data['error'])
+        
+        # 2. Módulo sin lecciones
+        payload_no_lessons = {
+            **self.valid_course_data,
+            "modules": [
+                {
+                    "title": "Módulo Vacío",
+                    "order": 1,
+                    "lessons": []
+                }
+            ]
+        }
+        response = self.client.post(self.url_crear_manual, payload_no_lessons, format='json')
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("El módulo debe contener al menos una lección", response.data['error'])
+        
+        # 3. Cuestionario con menos de 2 preguntas
+        payload_quiz_too_short = {
+            **self.valid_course_data,
+            "modules": [
+                {
+                    "title": "Módulo con Quiz Corto",
+                    "order": 1,
+                    "lessons": [
+                        {
+                            "title": "Lección 1",
+                            "duration": "10 min",
+                            "resource_type": "PDF",
+                            "resource_url": "http://example.com",
+                            "transcription": "Texto",
+                            "order": 1
+                        }
+                    ],
+                    "quiz": [
+                        {
+                            "question": "¿De qué color es el cielo?",
+                            "options": ["Azul", "Rojo"],
+                            "correct_option_index": 0
+                        }
+                    ]
+                }
+            ]
+        }
+        response = self.client.post(self.url_crear_manual, payload_quiz_too_short, format='json')
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("El cuestionario debe contener al menos 2 preguntas", response.data['error'])
+
+        # 4. Pregunta con menos de 2 opciones
+        payload_quiz_invalid_options = {
+            **self.valid_course_data,
+            "modules": [
+                {
+                    "title": "Módulo con Quiz Inválido",
+                    "order": 1,
+                    "lessons": [
+                        {
+                            "title": "Lección 1",
+                            "duration": "10 min",
+                            "resource_type": "PDF",
+                            "resource_url": "http://example.com",
+                            "transcription": "Texto",
+                            "order": 1
+                        }
+                    ],
+                    "quiz": [
+                        {
+                            "question": "¿De qué color es el cielo?",
+                            "options": ["Azul"],
+                            "correct_option_index": 0
+                        },
+                        {
+                            "question": "¿Cuál es la capital?",
+                            "options": ["París", "Madrid"],
+                            "correct_option_index": 0
+                        }
+                    ]
+                }
+            ]
+        }
+        response = self.client.post(self.url_crear_manual, payload_quiz_invalid_options, format='json')
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("Debe haber al menos 2 opciones de respuesta", response.data['error'])
+
+        # 5. Índice de respuesta correcta fuera de rango
+        payload_quiz_invalid_index = {
+            **self.valid_course_data,
+            "modules": [
+                {
+                    "title": "Módulo con Quiz Inválido 2",
+                    "order": 1,
+                    "lessons": [
+                        {
+                            "title": "Lección 1",
+                            "duration": "10 min",
+                            "resource_type": "PDF",
+                            "resource_url": "http://example.com",
+                            "transcription": "Texto",
+                            "order": 1
+                        }
+                    ],
+                    "quiz": [
+                        {
+                            "question": "¿De qué color es el cielo?",
+                            "options": ["Azul", "Verde"],
+                            "correct_option_index": 5
+                        },
+                        {
+                            "question": "¿Cuál es la capital?",
+                            "options": ["París", "Madrid"],
+                            "correct_option_index": 0
+                        }
+                    ]
+                }
+            ]
+        }
+        response = self.client.post(self.url_crear_manual, payload_quiz_invalid_index, format='json')
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("El índice de la opción correcta no es válido", response.data['error'])
