@@ -393,7 +393,8 @@ class CourseAPITests(APITestCase):
         url_detalle = f'/api/courses/{course.id}/'
         
         response = self.client.delete(url_detalle)
-        self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['message'], "Curso eliminado correctamente")
         self.assertFalse(Course.objects.filter(id=course.id).exists())
 
     def test_delete_course_as_other_professor_forbidden(self):
@@ -844,3 +845,39 @@ class CourseAPITests(APITestCase):
         # Limpieza
         if os.path.exists(quiz_file_path):
             os.remove(quiz_file_path)
+
+    def test_create_course_manual_atomic_rollback(self):
+        """ Valida que si ocurre un error inesperado al guardar módulos/lecciones, el curso no se crea (rollback) """
+        self.client.force_authenticate(user=self.professor_user)
+        
+        # Enviar un módulo con lecciones válidas pero forzaremos un fallo en db.add_lesson mediante un mock
+        nested_data = {
+            **self.valid_course_data,
+            "modules": [
+                {
+                    "title": "Módulo de Prueba Fallido",
+                    "order": 1,
+                    "lessons": [
+                        {
+                            "title": "Lección que fallará",
+                            "duration": "10 minutos",
+                            "resource_type": "PDF",
+                            "resource_url": "http://example.com/material.pdf",
+                            "transcription": "Texto de prueba",
+                            "order": 1
+                        }
+                    ]
+                }
+            ]
+        }
+        
+        from unittest.mock import patch
+        
+        with patch('courses.db.add_lesson', side_effect=Exception("Database error simulation")):
+            response = self.client.post(self.url_crear_manual, nested_data, format='json')
+            
+            # Debería retornar 500 error por la excepción simulada
+            self.assertEqual(response.status_code, status.HTTP_500_INTERNAL_SERVER_ERROR)
+            
+            # Verificamos que el curso NO se haya creado en la base de datos debido al rollback
+            self.assertFalse(Course.objects.filter(title="Ciberseguridad").exists())

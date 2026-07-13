@@ -12,13 +12,13 @@ from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
 from drf_spectacular.utils import extend_schema
 from rest_framework import serializers
-from django.db import connection
+from django.db import connection, transaction
 
 from .permissions import get_user_role, IsProfessorOrAdmin
 from .serializers import (
     AICourseInputSerializer, AICourseDetailResponseSerializer,
     LessonRatingSerializer, QuizSubmitSerializer, StudentCourseStateSerializer,
-    WrongQuestionSerializer
+    WrongQuestionSerializer, CourseCreationSerializer, ModuleCreateSerializer
 )
 from .services import AnthropicService, YouTubeService
 from courses import db
@@ -143,10 +143,10 @@ class CourseInputSchema(serializers.Serializer):
 )
 @extend_schema(
     methods=['POST'],
-    request=CourseInputSchema,
+    request=CourseCreationSerializer,
     summary="Crea un nuevo curso manualmente (Flujo Nadia)",
     description="Crea un curso asociándolo al PROFESSOR. MVP: Nace INACTIVO hasta que se cargue material.",
-    responses={201: dict, 400: dict}
+    responses={201: AICourseDetailResponseSerializer, 400: dict}
 )
 @api_view(['GET', 'POST'])
 @permission_classes([IsAuthenticated])
@@ -185,106 +185,47 @@ def course_list_create(request):
         if user_role not in ['ADMIN', 'PROFESSOR']:
             return Response({"error": "No tenés permisos para crear cursos."}, status=403)
 
-        title = request.data.get('title')
-        description = request.data.get('description', '')
-        level = request.data.get('level', 'beginner')
-        discipline = request.data.get('discipline', 'general')
-        objectives = request.data.get('objectives', '')
-        cover_image = request.data.get('cover_image', '')
-
-        if not title:
-            return Response({"error": "El título del curso es obligatorio."}, status=400)
-
-        modules_data = request.data.get('modules', [])
-
-        for m_idx, m_data in enumerate(modules_data, 1):
-            m_title = m_data.get('title', '').strip()
-            if not m_title:
-                return Response(
-                    {"error": f"El título del Módulo {m_idx} es obligatorio."},
-                    status=status.HTTP_400_BAD_REQUEST
-                )
-            lessons_data = m_data.get('lessons', [])
-            if not lessons_data:
-                return Response(
-                    {"error": f"El módulo '{m_title}' debe contener al menos una lección."},
-                    status=status.HTTP_400_BAD_REQUEST
-                )
-            for l_idx, l_data in enumerate(lessons_data, 1):
-                l_title = l_data.get('title', '').strip()
-                l_url = l_data.get('resource_url', '').strip()
-                l_dur = l_data.get('duration', '').strip()
-                if not l_title:
-                    return Response(
-                        {"error": f"La lección {l_idx} del módulo '{m_title}' debe tener un título."},
-                        status=status.HTTP_400_BAD_REQUEST
-                    )
-                if not l_dur:
-                    return Response(
-                        {"error": f"La lección '{l_title}' del módulo '{m_title}' debe tener una duración."},
-                        status=status.HTTP_400_BAD_REQUEST
-                    )
-                if not l_url:
-                    return Response(
-                        {"error": f"La lección '{l_title}' del módulo '{m_title}' debe tener una URL de recurso (material)."},
-                        status=status.HTTP_400_BAD_REQUEST
-                    )
-                res_type = l_data.get('resource_type', 'PDF')
-                if res_type not in ['PDF', 'YTB']:
-                    return Response(
-                        {"error": f"El tipo de recurso de '{l_title}' debe ser PDF o YTB (YouTube)."},
-                        status=status.HTTP_400_BAD_REQUEST
-                    )
+        serializer = CourseCreationSerializer(data=request.data, context={'request': request})
+        if not serializer.is_valid():
+            error_msg = None
+            for key, val in serializer.errors.items():
+                if isinstance(val, dict):
+                    for k2, v2 in val.items():
+                        if isinstance(v2, list) and len(v2) > 0:
+                            error_msg = v2[0]
+                            break
+                elif isinstance(val, list) and len(val) > 0:
+                    error_msg = val[0]
+                    break
+            if error_msg:
+                if isinstance(error_msg, dict):
+                    for k3, v3 in error_msg.items():
+                        if isinstance(v3, list) and len(v3) > 0:
+                            error_msg = v3[0]
+                            break
+                return Response({"error": str(error_msg)}, status=status.HTTP_400_BAD_REQUEST)
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
         try:
-            course_id = db.create_course_manual(
-                professor_id=user.id,
-                title=title,
-                description=description,
-                level=level,
-                discipline=discipline,
-                objectives=objectives,
-                cover_image=cover_image,
-                max_courses=settings.MAX_COURSES_PER_PROFESSOR,
-            )
+            course_data = serializer.save()
         except MaxCoursesReached:
             return Response(
                 {"error": "Un profesor solo puede tener un máximo de 2 cursos a la vez."},
-                status=400
+                status=status.HTTP_400_BAD_REQUEST
             )
         except Exception as e:
             logger.error(f"Error al crear curso manualmente: {str(e)}", exc_info=True)
-            return Response({"error": "Error interno al crear curso."}, status=500)
+            return Response({"error": "Error interno al crear curso."}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-        for m_idx, m_data in enumerate(modules_data, 1):
-            m_title = m_data.get('title').strip()
-            module_id = db.add_module(course_id, m_title, m_idx)
-            
-            for l_idx, l_data in enumerate(m_data.get('lessons', []), 1):
-                db.add_lesson(
-                    module_id,
-                    l_data['title'],
-                    l_data.get('duration', '15 minutos'),
-                    l_data.get('resource_type', 'PDF'),
-                    l_data.get('resource_url', ''),
-                    l_data.get('transcription', ''),
-                    l_idx
-                )
-
-            quiz_data = m_data.get('quiz')
-            if quiz_data:
-                db.save_module_quiz(module_id, quiz_data)
-
-        # Retornamos la respuesta con la estructura exacta que esperan las pruebas
         return Response(
             {
-                "id": course_id,
-                "title": title,
-                "description": description,
-                "level": level,
-                "discipline": discipline,
-                "objectives": objectives,
-                "cover_image": cover_image,
+                "id": course_data['id'],
+                "title": course_data['title'],
+                "description": course_data['description'],
+                "level": course_data['level'],
+                "discipline": course_data['discipline'],
+                "objectives": course_data['objectives'],
+                "cover_image": course_data['cover_image'],
                 "id_user": user.id,
                 "professor": user.username,
                 "is_active": False,
@@ -334,114 +275,112 @@ def generate_course_with_ai(request):
             generate_pdfs=generar_pdfs,
             generate_quizzes=generar_cuestionarios
         )
-    except Exception as e:
-        logger.error(f"Fallo al generar curso con IA: {str(e)}", exc_info=True)
-        return Response(
-            {"error": f"Error inesperado al generar el curso con IA: {str(e)}"},
-            status=status.HTTP_500_INTERNAL_SERVER_ERROR
-        )
 
-    resolved_cover_image = cover_image.strip()
-    if not resolved_cover_image:
-        resolved_cover_image = ia_data.get('cover_image', '').strip()
+        resolved_cover_image = cover_image.strip()
         if not resolved_cover_image:
-            resolved_cover_image = 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=800&q=80'
+            resolved_cover_image = ia_data.get('cover_image', '').strip()
+            if not resolved_cover_image:
+                resolved_cover_image = 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=800&q=80'
 
-    try:
-        course_id = db.create_course_ai(
-            professor_id=user.id,
-            title=ia_data.get('title', f"Curso de {objetivo_curso}"),
-            description=ia_data.get('description', ''),
-            level=db_level,
-            discipline=ia_data.get('discipline', discipline),
-            objectives=ia_data.get('objectives', learning_objectives or ''),
-            cover_image=resolved_cover_image,
-            max_courses=settings.MAX_COURSES_PER_PROFESSOR
-        )
+        with transaction.atomic():
+            course_id = db.create_course_ai(
+                professor_id=user.id,
+                title=ia_data.get('title', f"Curso de {objetivo_curso}"),
+                description=ia_data.get('description', ''),
+                level=db_level,
+                discipline=ia_data.get('discipline', discipline),
+                objectives=ia_data.get('objectives', learning_objectives or ''),
+                cover_image=resolved_cover_image,
+                max_courses=settings.MAX_COURSES_PER_PROFESSOR
+            )
+
+            quizzes = {}
+            modules_data = ia_data.get('modules', [])
+
+            for idx, m_data in enumerate(modules_data, 1):
+                module_id = db.add_module(course_id, m_data.get('title', f"Módulo {idx}"), idx)
+
+                lesson_order = 1
+                yt_query = m_data.get('youtube_query')
+                if yt_query:
+                    video_info = YouTubeService.search_course_video(yt_query)
+                    if video_info:
+                        db.add_lesson(
+                            module_id=module_id,
+                            title=video_info.get('title', f"Video del Módulo {idx}"),
+                            duration="15 minutos",
+                            resource_type='YTB',
+                            resource_url=video_info.get('url', ''),
+                            transcription='',
+                            order=lesson_order
+                        )
+                    else:
+                        db.add_lesson(
+                            module_id=module_id,
+                            title=f"Video introductorio - Módulo {idx}",
+                            duration="15 minutos",
+                            resource_type='YTB',
+                            resource_url="https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+                            transcription='',
+                            order=lesson_order
+                        )
+                    lesson_order += 1
+
+                if generar_pdfs:
+                    pdf_title = m_data.get('pdf_title') or f"Lectura del Módulo {idx}"
+                    pdf_content = m_data.get('pdf_content', '')
+
+                    media_root = getattr(settings, 'MEDIA_ROOT', os.path.join(settings.BASE_DIR, 'media'))
+                    courses_media_dir = os.path.join(media_root, 'courses')
+                    os.makedirs(courses_media_dir, exist_ok=True)
+
+                    file_name = f"lectura_modulo_{module_id}.pdf"
+                    file_path = os.path.join(courses_media_dir, file_name)
+                    
+                    prof_name = (user.get_full_name() or user.username).replace('.', ' ')
+                    gen_date = timezone.now().strftime("%d/%m/%Y")
+                    generate_pdf_from_text(
+                        pdf_path=file_path,
+                        title=pdf_title,
+                        content=pdf_content,
+                        professor_name=prof_name,
+                        course_title=ia_data.get('title', f"Curso de {objetivo_curso}"),
+                        generation_date=gen_date
+                    )
+                    media_url = getattr(settings, 'MEDIA_URL', '/media/')
+                    resource_url = f"{media_url}courses/{file_name}"
+
+                    db.add_lesson(
+                        module_id=module_id,
+                        title=pdf_title,
+                        duration="10 minutos",
+                        resource_type='PDF',
+                        resource_url=resource_url,
+                        transcription='',
+                        order=lesson_order
+                    )
+                    lesson_order += 1
+
+                if generar_cuestionarios:
+                    quiz_data = m_data.get('quiz', [])
+                    db.save_module_quiz(module_id, quiz_data)
+                    quizzes[module_id] = quiz_data
+
+            course = db.get_course_detail(course_id)
+            serializer = AICourseDetailResponseSerializer(course, context={'quizzes': quizzes})
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+
     except MaxCoursesReached:
         return Response(
             {"error": "Un profesor solo puede tener un máximo de 2 cursos a la vez."},
-            status=400
+            status=status.HTTP_400_BAD_REQUEST
         )
-
-    quizzes = {}
-    modules_data = ia_data.get('modules', [])
-
-    for idx, m_data in enumerate(modules_data, 1):
-        module_id = db.add_module(course_id, m_data.get('title', f"Módulo {idx}"), idx)
-
-        lesson_order = 1
-        yt_query = m_data.get('youtube_query')
-        if yt_query:
-            video_info = YouTubeService.search_course_video(yt_query)
-            if video_info:
-                db.add_lesson(
-                    module_id=module_id,
-                    title=video_info.get('title', f"Video del Módulo {idx}"),
-                    duration="15 minutos",
-                    resource_type='YTB',
-                    resource_url=video_info.get('url', ''),
-                    transcription='',
-                    order=lesson_order
-                )
-            else:
-                db.add_lesson(
-                    module_id=module_id,
-                    title=f"Video introductorio - Módulo {idx}",
-                    duration="15 minutos",
-                    resource_type='YTB',
-                    resource_url="https://www.youtube.com/watch?v=dQw4w9WgXcQ",
-                    transcription='',
-                    order=lesson_order
-                )
-            lesson_order += 1
-
-        if generar_pdfs:
-            pdf_title = m_data.get('pdf_title') or f"Lectura del Módulo {idx}"
-            pdf_content = m_data.get('pdf_content', '')
-
-            media_root = getattr(settings, 'MEDIA_ROOT', os.path.join(settings.BASE_DIR, 'media'))
-            courses_media_dir = os.path.join(media_root, 'courses')
-            os.makedirs(courses_media_dir, exist_ok=True)
-
-            file_name = f"lectura_modulo_{module_id}.pdf"
-            file_path = os.path.join(courses_media_dir, file_name)
-            try:
-                prof_name = (user.get_full_name() or user.username).replace('.', ' ')
-                gen_date = timezone.now().strftime("%d/%m/%Y")
-                generate_pdf_from_text(
-                    pdf_path=file_path,
-                    title=pdf_title,
-                    content=pdf_content,
-                    professor_name=prof_name,
-                    course_title=ia_data.get('title', f"Curso de {objetivo_curso}"),
-                    generation_date=gen_date
-                )
-                media_url = getattr(settings, 'MEDIA_URL', '/media/')
-                resource_url = f"{media_url}courses/{file_name}"
-            except Exception as fe:
-                logger.error("Error al escribir archivo PDF de lectura: %s", fe)
-                resource_url = ""
-
-            db.add_lesson(
-                module_id=module_id,
-                title=pdf_title,
-                duration="10 minutos",
-                resource_type='PDF',
-                resource_url=resource_url,
-                transcription='',
-                order=lesson_order
-            )
-            lesson_order += 1
-
-        if generar_cuestionarios:
-            quiz_data = m_data.get('quiz', [])
-            db.save_module_quiz(module_id, quiz_data)
-            quizzes[module_id] = quiz_data
-
-    course = db.get_course_detail(course_id)
-    serializer = AICourseDetailResponseSerializer(course, context={'quizzes': quizzes})
-    return Response(serializer.data, status=status.HTTP_201_CREATED)
+    except Exception as e:
+        logger.error(f"Fallo al generar curso con IA: {str(e)}", exc_info=True)
+        return Response(
+            {"error": f"Fallo al generar el curso con IA debido a un error interno: {str(e)}"},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
 
 
 @extend_schema(
@@ -662,7 +601,7 @@ def course_detail(request, course_id):
         with connection.cursor() as cur:
             cur.execute("DELETE FROM courses WHERE id = %s", [course_id])
 
-        return Response(status=status.HTTP_204_NO_CONTENT)
+        return Response({"message": "Curso eliminado correctamente"}, status=status.HTTP_200_OK)
 
 
 @extend_schema(
@@ -684,11 +623,16 @@ def manage_modules(request, course_id):
     if user_role != 'ADMIN' and course['professor_id'] != user.id:
         return Response({"error": "No tienes permisos para gestionar los módulos de este curso."}, status=status.HTTP_403_FORBIDDEN)
 
-    title = request.data.get('title')
-    if not title:
-        return Response({"error": "El título del módulo es obligatorio."}, status=status.HTTP_400_BAD_REQUEST)
+    serializer = ModuleCreateSerializer(data={
+        'course_id': course_id,
+        'title': request.data.get('title'),
+        'order': request.data.get('order')
+    })
+    if not serializer.is_valid():
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-    order = request.data.get('order')
+    title = serializer.validated_data['title']
+    order = serializer.validated_data.get('order')
     if order is not None:
         order = int(order)
 
