@@ -1,4 +1,18 @@
 from rest_framework import serializers
+from drf_spectacular.utils import extend_schema_field
+
+class QuizQuestionSerializer(serializers.Serializer):
+    question = serializers.CharField(required=True, help_text="Texto de la pregunta.")
+    options = serializers.ListField(
+        child=serializers.CharField(),
+        required=True,
+        help_text="Lista de opciones de respuesta (mínimo 2)."
+    )
+    correct_option_index = serializers.IntegerField(
+        required=True,
+        help_text="Índice de la opción correcta (basado en 0)."
+    )
+
 
 class ManualCourseSerializer(serializers.Serializer):
     """
@@ -93,6 +107,7 @@ class ModuleDetailSerializer(serializers.Serializer):
     lessons = LessonDetailSerializer(many=True, read_only=True)
     quiz = serializers.SerializerMethodField(required=False)
 
+    @extend_schema_field(QuizQuestionSerializer(many=True))
     def get_quiz(self, obj):
         quizzes = self.context.get('quizzes', {})
         module_id = obj.get('id') if isinstance(obj, dict) else getattr(obj, 'id', None)
@@ -132,7 +147,7 @@ class ModuleCreationSerializer(serializers.Serializer):
     title = serializers.CharField(max_length=255, required=True, help_text="Título del módulo.")
     order = serializers.IntegerField(required=False, default=1, help_text="Orden del módulo.")
     lessons = LessonCreationSerializer(many=True, required=True, help_text="Lecciones del módulo (mínimo 1).")
-    quiz = serializers.JSONField(required=False, default=list, help_text="Cuestionario opcional del módulo.")
+    quiz = QuizQuestionSerializer(many=True, required=False, default=list, help_text="Preguntas del cuestionario.")
 
     def validate_lessons(self, value):
         if not value or len(value) == 0:
@@ -198,8 +213,10 @@ class CourseCreationSerializer(serializers.Serializer):
                         raise serializers.ValidationError(
                             f"El cuestionario del Módulo '{m_title}' debe contener al menos 2 preguntas."
                         )
+                    quiz_data_plain = []
                     for q_idx, qItem in enumerate(quiz_data):
-                        if not qItem.get('question', '').strip():
+                        question_text = qItem.get('question', '').strip()
+                        if not question_text:
                             raise serializers.ValidationError(
                                 f"La pregunta {q_idx + 1} del cuestionario del Módulo '{m_title}' no puede estar vacía."
                             )
@@ -218,7 +235,12 @@ class CourseCreationSerializer(serializers.Serializer):
                             raise serializers.ValidationError(
                                 f"Selecciona la respuesta correcta para la pregunta {q_idx + 1} del cuestionario del Módulo '{m_title}'."
                             )
-                    db.save_module_quiz(module_id, quiz_data)
+                        quiz_data_plain.append({
+                            "question": question_text,
+                            "options": [str(o).strip() for o in options],
+                            "correct_option_index": correct_idx
+                        })
+                    db.save_module_quiz(module_id, quiz_data_plain)
 
             return {
                 "id": course_id,

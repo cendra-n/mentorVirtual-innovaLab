@@ -10,7 +10,7 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
-from drf_spectacular.utils import extend_schema
+from drf_spectacular.utils import extend_schema, OpenApiExample
 from rest_framework import serializers
 from django.db import connection, transaction
 
@@ -146,6 +146,49 @@ class CourseInputSchema(serializers.Serializer):
     request=CourseCreationSerializer,
     summary="Crea un nuevo curso manualmente (Flujo Nadia)",
     description="Crea un curso asociándolo al PROFESSOR. MVP: Nace INACTIVO hasta que se cargue material.",
+    examples=[
+        OpenApiExample(
+            'Ejemplo de Creación de Curso Manual',
+            summary='Payload válido con un módulo, lección PDF y un cuestionario estructurado',
+            value={
+                "title": "Introducción a Python",
+                "description": "Curso completo de Python básico a intermedio.",
+                "level": "beginner",
+                "discipline": "programacion",
+                "objectives": "Al final del curso podrás construir pequeños scripts y automatizaciones.",
+                "cover_image": "http://example.com/portada-python.jpg",
+                "modules": [
+                    {
+                        "title": "Módulo 1: Sintaxis Básica",
+                        "order": 1,
+                        "lessons": [
+                            {
+                                "title": "Variables y Operadores",
+                                "duration": "15 minutos",
+                                "resource_type": "PDF",
+                                "resource_url": "http://example.com/material-python-mod1.pdf",
+                                "transcription": "En esta lección aprenderemos sobre tipos de datos...",
+                                "order": 1
+                            }
+                        ],
+                        "quiz": [
+                            {
+                                "question": "¿Cuál es la sintaxis correcta para imprimir en Python?",
+                                "options": ["print('Hola')", "echo 'Hola'", "console.log('Hola')"],
+                                "correct_option_index": 0
+                            },
+                            {
+                                "question": "¿Qué tipo de dato es el valor True?",
+                                "options": ["String", "Integer", "Boolean"],
+                                "correct_option_index": 2
+                            }
+                        ]
+                    }
+                ]
+            },
+            request_only=True
+        )
+    ],
     responses={201: AICourseDetailResponseSerializer, 400: dict}
 )
 @api_view(['GET', 'POST'])
