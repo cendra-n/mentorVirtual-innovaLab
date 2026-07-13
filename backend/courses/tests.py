@@ -881,3 +881,43 @@ class CourseAPITests(APITestCase):
             
             # Verificamos que el curso NO se haya creado en la base de datos debido al rollback
             self.assertFalse(Course.objects.filter(title="Ciberseguridad").exists())
+
+    def test_delete_course_cleans_up_files(self):
+        """ Valida que al eliminar un curso, se borren los archivos físicos de lectura (PDF) y quiz (JSON) de sus módulos """
+        import os
+        from django.conf import settings
+        self.client.force_authenticate(user=self.professor_user)
+        
+        course = Course.objects.create(
+            title="Curso Para Borrar", description="Desc", level="medio", 
+            discipline="it", objectives="obj", professor=self.professor_user, is_active=True
+        )
+        from .models import Module
+        module = Module.objects.create(course=course, title="Módulo Temporal", order=1)
+        
+        media_root = getattr(settings, 'MEDIA_ROOT', os.path.join(settings.BASE_DIR, 'media'))
+        courses_media_dir = os.path.join(media_root, 'courses')
+        os.makedirs(courses_media_dir, exist_ok=True)
+        
+        pdf_path = os.path.join(courses_media_dir, f"lectura_modulo_{module.id}.pdf")
+        quiz_path = os.path.join(courses_media_dir, f"quiz_modulo_{module.id}.json")
+        
+        with open(pdf_path, 'w') as f:
+            f.write("Simulated PDF content")
+        with open(quiz_path, 'w') as f:
+            f.write("[]")
+            
+        self.assertTrue(os.path.exists(pdf_path))
+        self.assertTrue(os.path.exists(quiz_path))
+        
+        url_detalle = f'/api/courses/{course.id}/'
+        response = self.client.delete(url_detalle)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        
+        self.assertFalse(os.path.exists(pdf_path))
+        self.assertFalse(os.path.exists(quiz_path))
+        
+        if os.path.exists(pdf_path):
+            os.remove(pdf_path)
+        if os.path.exists(quiz_path):
+            os.remove(quiz_path)
