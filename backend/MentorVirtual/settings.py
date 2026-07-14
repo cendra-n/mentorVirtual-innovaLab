@@ -13,9 +13,6 @@ import os
 from pathlib import Path
 from datetime import timedelta
 
-ANTHROPIC_API_KEY = os.environ.get('ANTHROPIC_API_KEY', '')
-YOUTUBE_API_KEY   = os.environ.get('YOUTUBE_API_KEY', '')
-
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -217,10 +214,33 @@ CSRF_TRUSTED_ORIGINS = [
 
 
 # APIs externas
-ANTHROPIC_API_KEY = os.environ.get('ANTHROPIC_API_KEY', '')
 YOUTUBE_API_KEY   = os.environ.get('YOUTUBE_API_KEY', '')
 FRONTEND_URL      = os.environ.get('FRONTEND_URL', 'http://localhost:5173')
 MAX_COURSES_PER_PROFESSOR = int(os.environ.get("MAX_COURSES_PER_PROFESSOR", 2))
+
+# ── Proveedor de IA (core/ai_providers.py) ────────────────────────────────────
+# AI_PROVIDER sin default a propósito: get_ai_provider() debe fallar explícito
+# (ImproperlyConfigured) si no está seteado, en vez de asumir un proveedor.
+AI_PROVIDER = os.environ.get('AI_PROVIDER', '')
+
+ANTHROPIC_API_KEY = os.environ.get('ANTHROPIC_API_KEY', '')
+ANTHROPIC_MODEL   = os.environ.get('ANTHROPIC_MODEL', 'claude-sonnet-4-6')
+
+OPENAI_API_KEY = os.environ.get('OPENAI_API_KEY', '')
+OPENAI_MODEL   = os.environ.get('OPENAI_MODEL', 'gpt-4o-mini')
+
+DEEPSEEK_API_KEY = os.environ.get('DEEPSEEK_API_KEY', '')
+DEEPSEEK_MODEL   = os.environ.get('DEEPSEEK_MODEL', 'deepseek-chat')
+
+GEMINI_API_KEY = os.environ.get('GEMINI_API_KEY', '')
+GEMINI_MODEL   = os.environ.get('GEMINI_MODEL', 'gemini-2.0-flash')
+
+OLLAMA_MODEL = os.environ.get('OLLAMA_MODEL', 'llama3')
+OLLAMA_URL   = os.environ.get('OLLAMA_URL', 'http://localhost:11434')
+
+# Máximo de tokens de salida al generar el plan de un goal (pasos + logros en JSON).
+# 1024 se quedaba corto y Claude cortaba el JSON a la mitad de un string.
+GOALS_PLAN_MAX_TOKENS = int(os.environ.get('GOALS_PLAN_MAX_TOKENS', 2048))
 
 # Media files
 MEDIA_URL = '/media/'

@@ -6,20 +6,22 @@ Endpoints:
   GET  /api/tutor/books/           → listar libros del usuario
   DELETE /api/tutor/books/<id>/    → eliminar libro
   POST /api/tutor/books/<id>/ask/  → hacer una pregunta al libro
+  POST /api/tutor/ask_step/        → preguntar sobre el paso actual de un goal
+  POST /api/tutor/chat/            → chat libre con Pulso (busca en libros + lecciones, sino IA)
 """
 import os
+import re
 import logging
 import tempfile
-import urllib.request
-import json
 
-from django.conf import settings
 from django.db import connection
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from rest_framework import status
 from rest_framework.parsers import MultiPartParser
+
+from core.ai_providers import get_ai_provider
 
 from .pdf_processor import extract_chunks
 from .embeddings import embed_text, embed_batch
@@ -37,12 +39,26 @@ Respondés ÚNICAMENTE basándote en el contenido del libro proporcionado.
 Si la respuesta no está en el libro, decís amablemente que ese tema no está cubierto en este material.
 Máximo 3 párrafos. Usás lenguaje simple y accesible."""
 
+# Prompt de Pulso — el asistente general del chat libre (no atado a un paso puntual)
+PULSO_SYSTEM = """Sos Pulso, el mentor virtual de una plataforma educativa para personas adultas que retoman sus estudios.
+Tu estilo es cálido, motivador, cercano y usás ejemplos de la vida cotidiana para explicar conceptos.
+Si te pasan fragmentos de contenido (libros o lecciones del alumno), respondé basándote en ellos.
+Si no hay fragmentos relevantes, respondé con tu conocimiento general pero aclarando que no es contenido específico de sus cursos.
+Máximo 3 párrafos. Lenguaje simple y accesible."""
+
 TUTOR_PROMPT = """El alumno pregunta: "{question}"
 
 Fragmentos relevantes del libro (páginas {pages}):
 {context}
 
 Respondé la pregunta basándote únicamente en estos fragmentos. Sé claro, empático y motivador."""
+
+STOPWORDS = {
+    'que', 'como', 'para', 'esta', 'esto', 'ese', 'esa', 'donde', 'cuando',
+    'porque', 'pero', 'con', 'una', 'unos', 'unas', 'sobre', 'entre', 'desde',
+    'hola', 'buenas', 'quiero', 'puedo', 'podes', 'podés', 'quisiera', 'algo',
+}
+
 
 
 class BookListView(APIView):
@@ -200,41 +216,24 @@ Su pregunta es: "{question}"
 Respondé SOLO sobre este tema específico. Si no tenés certeza, decí "No tengo suficiente información sobre eso, pero puedo decirte que..." y orientalo. No inventes datos. Sé breve y claro."""
 
         try:
-            payload = json.dumps({
-                "model": "claude-fable-5",
-                "max_tokens": 400,
-                "system": TUTOR_SYSTEM,
-                "messages": [{"role": "user", "content": prompt}],
-            }).encode()
-
-            req = urllib.request.Request(
-                "https://api.anthropic.com/v1/messages",
-                data=payload,
-                headers={
-                    "Content-Type": "application/json",
-                    "x-api-key": settings.ANTHROPIC_API_KEY,
-                    "anthropic-version": "2023-06-01",
-                },
-                method="POST",
-            )
-
-            with urllib.request.urlopen(req, timeout=30) as resp:
-                data = json.loads(resp.read())
-
-            answer = ""
-            for block in data.get("content", []):
-                if block.get("type") == "text":
-                    answer = block.get("text", "")
-                    break
+            ai = get_ai_provider()
+            answer = ai.complete(system=TUTOR_SYSTEM, prompt=prompt, max_tokens=400)
 
         except Exception as e:
-            logger.error(f"Error Claude API en ask_step: {e}")
+            logger.error(f"Error del proveedor de IA en ask_step: {e}")
             return Response({'error': 'No se pudo generar la respuesta.'}, status=503)
 
         return Response({
             'answer': answer,
             'source': source_label,
         })
+
+
+class BookAskView(APIView):
+    """
+    POST /api/tutor/books/<book_id>/ask/
+    Hacer una pregunta puntual sobre un libro específico ya indexado.
+    """
     permission_classes = [IsAuthenticated]
 
     def post(self, request, book_id):
@@ -260,40 +259,135 @@ Respondé SOLO sobre este tema específico. Si no tenés certeza, decí "No teng
             pages=pages,
         )
 
-        # Llamar a Claude API
+        # Llamar al proveedor de IA configurado
         try:
-            payload = json.dumps({
-                "model": "claude-fable-5",
-                "max_tokens": 512,
-                "system": TUTOR_SYSTEM,
-                "messages": [{"role": "user", "content": prompt}],
-            }).encode()
-
-            req = urllib.request.Request(
-                "https://api.anthropic.com/v1/messages",
-                data=payload,
-                headers={
-                    "Content-Type": "application/json",
-                    "x-api-key": settings.ANTHROPIC_API_KEY,
-                    "anthropic-version": "2023-06-01",
-                },
-                method="POST",
-            )
-
-            with urllib.request.urlopen(req, timeout=30) as resp:
-                data = json.loads(resp.read())
-
-            answer = ""
-            for block in data.get("content", []):
-                if block.get("type") == "text":
-                    answer = block.get("text", "")
-                    break
+            ai = get_ai_provider()
+            answer = ai.complete(system=TUTOR_SYSTEM, prompt=prompt, max_tokens=512)
 
         except Exception as e:
-            logger.error(f"Error Claude API en tutor: {e}")
+            logger.error(f"Error del proveedor de IA en tutor: {e}")
             return Response({'error': 'No se pudo generar la respuesta.'}, status=503)
 
         return Response({
             'answer':  answer,
             'sources': [{'page': c['page_num'], 'similarity': round(float(c['similarity']), 3)} for c in chunks],
+        })
+
+
+def _keywords(text: str, min_len: int = 4) -> list[str]:
+    """Extrae palabras significativas de un texto para búsqueda por ILIKE."""
+    words = re.findall(r'\w+', text.lower())
+    return list(dict.fromkeys(
+        w for w in words if len(w) >= min_len and w not in STOPWORDS
+    ))[:8]
+
+
+def _search_books(user_id: int, question: str, limit: int = 2):
+    """Busca en los libros del usuario (tutor_chunks) por similitud de embeddings."""
+    query_embedding = embed_text(question)
+    with connection.cursor() as cur:
+        cur.execute(
+            """
+            SELECT tc.content, tc.page_num, tb.title,
+                   1 - (tc.embedding <=> %s::vector) AS similarity
+            FROM tutor_chunks tc
+            JOIN tutor_books tb ON tb.id = tc.book_id
+            WHERE tb.user_id = %s
+            ORDER BY tc.embedding <=> %s::vector
+            LIMIT %s
+            """,
+            [str(query_embedding), user_id, str(query_embedding), limit]
+        )
+        rows = cur.fetchall()
+    return [
+        {'content': r[0], 'page_num': r[1], 'source': r[2], 'similarity': float(r[3])}
+        for r in rows if float(r[3]) > 0.4
+    ]
+
+
+def _search_lessons(user_id: int, question: str, limit: int = 2):
+    """Busca en las transcripciones de lecciones de los cursos en los que el alumno está inscripto."""
+    words = _keywords(question)
+    if not words:
+        return []
+
+    conditions = " OR ".join(["cl.transcription ILIKE %s"] * len(words))
+    params = [f"%{w}%" for w in words]
+
+    with connection.cursor() as cur:
+        cur.execute(
+            f"""
+            SELECT cl.title, cl.transcription, cm.title, c.title
+            FROM course_lessons cl
+            JOIN course_modules cm ON cm.id = cl.module_id
+            JOIN courses c ON c.id = cm.course_id
+            JOIN student_course_state scs ON scs.course_id = c.id
+            WHERE scs.student_id = %s AND ({conditions})
+            LIMIT %s
+            """,
+            [user_id] + params + [limit]
+        )
+        rows = cur.fetchall()
+    return [
+        {'lesson': r[0], 'content': r[1], 'module': r[2], 'course': r[3]}
+        for r in rows if r[1]
+    ]
+
+
+class PulsoChatView(APIView):
+    """
+    POST /api/tutor/chat/
+    Chat libre con Pulso (no atado a un paso puntual). Busca primero en los
+    libros del usuario y en las transcripciones de sus lecciones; si no
+    encuentra nada relevante, responde con la IA configurada usando su
+    conocimiento general.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        question = request.data.get('question', '').strip()
+        if not question:
+            return Response({'error': 'La pregunta es obligatoria.'}, status=400)
+
+        user_id = request.user.id
+
+        book_chunks   = _search_books(user_id, question)
+        lesson_chunks = _search_lessons(user_id, question)
+
+        context_parts = []
+        sources = []
+
+        for c in book_chunks:
+            context_parts.append(f"[Libro: {c['source']}, Pág. {c['page_num']}] {c['content']}")
+            sources.append({'type': 'book', 'title': c['source'], 'page': c['page_num']})
+
+        for l in lesson_chunks:
+            context_parts.append(f"[Curso: {l['course']} > {l['module']} > {l['lesson']}] {l['content']}")
+            sources.append({'type': 'lesson', 'title': l['lesson'], 'course': l['course']})
+
+        if context_parts:
+            context = '\n\n'.join(context_parts)
+            prompt = f"""El alumno pregunta: "{question}"
+
+Fragmentos relevantes encontrados en su material (libros y lecciones):
+{context}
+
+Respondé la pregunta basándote en estos fragmentos. Sé claro, empático y motivador."""
+        else:
+            prompt = f"""El alumno pregunta: "{question}"
+
+No se encontró contenido específico en sus libros o lecciones sobre este tema.
+Respondé con tu conocimiento general, breve y motivador, aclarando amablemente que no es contenido puntual de sus cursos."""
+
+        try:
+            ai = get_ai_provider()
+            answer = ai.complete(system=PULSO_SYSTEM, prompt=prompt, max_tokens=500)
+
+        except Exception as e:
+            logger.error(f"Error del proveedor de IA en chat: {e}")
+            return Response({'error': 'No se pudo generar la respuesta.'}, status=503)
+
+        return Response({
+            'answer':  answer,
+            'sources': sources,
         })
