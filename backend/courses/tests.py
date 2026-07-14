@@ -393,7 +393,8 @@ class CourseAPITests(APITestCase):
         url_detalle = f'/api/courses/{course.id}/'
         
         response = self.client.delete(url_detalle)
-        self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['message'], "Curso eliminado correctamente")
         self.assertFalse(Course.objects.filter(id=course.id).exists())
 
     def test_delete_course_as_other_professor_forbidden(self):
@@ -844,3 +845,210 @@ class CourseAPITests(APITestCase):
         # Limpieza
         if os.path.exists(quiz_file_path):
             os.remove(quiz_file_path)
+
+    def test_create_course_manual_atomic_rollback(self):
+        """ Valida que si ocurre un error inesperado al guardar módulos/lecciones, el curso no se crea (rollback) """
+        self.client.force_authenticate(user=self.professor_user)
+        
+        # Enviar un módulo con lecciones válidas pero forzaremos un fallo en db.add_lesson mediante un mock
+        nested_data = {
+            **self.valid_course_data,
+            "modules": [
+                {
+                    "title": "Módulo de Prueba Fallido",
+                    "order": 1,
+                    "lessons": [
+                        {
+                            "title": "Lección que fallará",
+                            "duration": "10 minutos",
+                            "resource_type": "PDF",
+                            "resource_url": "http://example.com/material.pdf",
+                            "transcription": "Texto de prueba",
+                            "order": 1
+                        }
+                    ]
+                }
+            ]
+        }
+        
+        from unittest.mock import patch
+        
+        with patch('courses.db.add_lesson', side_effect=Exception("Database error simulation")):
+            response = self.client.post(self.url_crear_manual, nested_data, format='json')
+            
+            # Debería retornar 500 error por la excepción simulada
+            self.assertEqual(response.status_code, status.HTTP_500_INTERNAL_SERVER_ERROR)
+            
+            # Verificamos que el curso NO se haya creado en la base de datos debido al rollback
+            self.assertFalse(Course.objects.filter(title="Ciberseguridad").exists())
+
+    def test_delete_course_cleans_up_files(self):
+        """ Valida que al eliminar un curso, se borren los archivos físicos de lectura (PDF) y quiz (JSON) de sus módulos """
+        import os
+        from django.conf import settings
+        self.client.force_authenticate(user=self.professor_user)
+        
+        course = Course.objects.create(
+            title="Curso Para Borrar", description="Desc", level="medio", 
+            discipline="it", objectives="obj", professor=self.professor_user, is_active=True
+        )
+        from .models import Module
+        module = Module.objects.create(course=course, title="Módulo Temporal", order=1)
+        
+        media_root = getattr(settings, 'MEDIA_ROOT', os.path.join(settings.BASE_DIR, 'media'))
+        courses_media_dir = os.path.join(media_root, 'courses')
+        os.makedirs(courses_media_dir, exist_ok=True)
+        
+        pdf_path = os.path.join(courses_media_dir, f"lectura_modulo_{module.id}.pdf")
+        quiz_path = os.path.join(courses_media_dir, f"quiz_modulo_{module.id}.json")
+        
+        with open(pdf_path, 'w') as f:
+            f.write("Simulated PDF content")
+        with open(quiz_path, 'w') as f:
+            f.write("[]")
+            
+        self.assertTrue(os.path.exists(pdf_path))
+        self.assertTrue(os.path.exists(quiz_path))
+        
+        url_detalle = f'/api/courses/{course.id}/'
+        response = self.client.delete(url_detalle)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        
+        self.assertFalse(os.path.exists(pdf_path))
+        self.assertFalse(os.path.exists(quiz_path))
+        
+        if os.path.exists(pdf_path):
+            os.remove(pdf_path)
+        if os.path.exists(quiz_path):
+            os.remove(quiz_path)
+
+    def test_create_course_manual_validation_errors(self):
+        """ Valida que se lancen excepciones con mensajes específicos y claros para errores de validación estructurados """
+        self.client.force_authenticate(user=self.professor_user)
+        
+        # 1. Falta módulo
+        payload_no_modules = {
+            **self.valid_course_data,
+            "modules": []
+        }
+        response = self.client.post(self.url_crear_manual, payload_no_modules, format='json')
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("El curso debe contener al menos un módulo", response.data['error'])
+        
+        # 2. Módulo sin lecciones
+        payload_no_lessons = {
+            **self.valid_course_data,
+            "modules": [
+                {
+                    "title": "Módulo Vacío",
+                    "order": 1,
+                    "lessons": []
+                }
+            ]
+        }
+        response = self.client.post(self.url_crear_manual, payload_no_lessons, format='json')
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("El módulo debe contener al menos una lección", response.data['error'])
+        
+        # 3. Cuestionario con menos de 2 preguntas
+        payload_quiz_too_short = {
+            **self.valid_course_data,
+            "modules": [
+                {
+                    "title": "Módulo con Quiz Corto",
+                    "order": 1,
+                    "lessons": [
+                        {
+                            "title": "Lección 1",
+                            "duration": "10 min",
+                            "resource_type": "PDF",
+                            "resource_url": "http://example.com",
+                            "transcription": "Texto",
+                            "order": 1
+                        }
+                    ],
+                    "quiz": [
+                        {
+                            "question": "¿De qué color es el cielo?",
+                            "options": ["Azul", "Rojo"],
+                            "correct_option_index": 0
+                        }
+                    ]
+                }
+            ]
+        }
+        response = self.client.post(self.url_crear_manual, payload_quiz_too_short, format='json')
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("El cuestionario debe contener al menos 2 preguntas", response.data['error'])
+
+        # 4. Pregunta con menos de 2 opciones
+        payload_quiz_invalid_options = {
+            **self.valid_course_data,
+            "modules": [
+                {
+                    "title": "Módulo con Quiz Inválido",
+                    "order": 1,
+                    "lessons": [
+                        {
+                            "title": "Lección 1",
+                            "duration": "10 min",
+                            "resource_type": "PDF",
+                            "resource_url": "http://example.com",
+                            "transcription": "Texto",
+                            "order": 1
+                        }
+                    ],
+                    "quiz": [
+                        {
+                            "question": "¿De qué color es el cielo?",
+                            "options": ["Azul"],
+                            "correct_option_index": 0
+                        },
+                        {
+                            "question": "¿Cuál es la capital?",
+                            "options": ["París", "Madrid"],
+                            "correct_option_index": 0
+                        }
+                    ]
+                }
+            ]
+        }
+        response = self.client.post(self.url_crear_manual, payload_quiz_invalid_options, format='json')
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("Debe haber al menos 2 opciones de respuesta", response.data['error'])
+
+        # 5. Índice de respuesta correcta fuera de rango
+        payload_quiz_invalid_index = {
+            **self.valid_course_data,
+            "modules": [
+                {
+                    "title": "Módulo con Quiz Inválido 2",
+                    "order": 1,
+                    "lessons": [
+                        {
+                            "title": "Lección 1",
+                            "duration": "10 min",
+                            "resource_type": "PDF",
+                            "resource_url": "http://example.com",
+                            "transcription": "Texto",
+                            "order": 1
+                        }
+                    ],
+                    "quiz": [
+                        {
+                            "question": "¿De qué color es el cielo?",
+                            "options": ["Azul", "Verde"],
+                            "correct_option_index": 5
+                        },
+                        {
+                            "question": "¿Cuál es la capital?",
+                            "options": ["París", "Madrid"],
+                            "correct_option_index": 0
+                        }
+                    ]
+                }
+            ]
+        }
+        response = self.client.post(self.url_crear_manual, payload_quiz_invalid_index, format='json')
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("El índice de la opción correcta no es válido", response.data['error'])
