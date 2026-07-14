@@ -1,6 +1,6 @@
 """
 Servicios externos:
-  - Claude API  → genera plan adaptativo (pasos + logros)
+  - IA (proveedor configurado en .env) → genera plan adaptativo (pasos + logros)
   - YouTube API → busca videos reales para cada paso
 """
 import json
@@ -10,10 +10,14 @@ import urllib.parse
 
 from django.conf import settings
 
+from core.ai_providers import get_ai_provider
+
 logger = logging.getLogger(__name__)
 
 
-# ── Claude API ────────────────────────────────────────────────────────────────
+# ── IA (proveedor configurado en AI_PROVIDER) ─────────────────────────────────
+
+PLAN_SYSTEM = "Respondé siempre en español rioplatense. Sé empático, claro y motivador. Usá ejemplos de la vida cotidiana. Máximo 3 párrafos por respuesta."
 
 PLAN_PROMPT = """
 Eres un mentor educativo empático que ayuda a adultos que no completaron su educación formal.
@@ -46,38 +50,14 @@ Respondé ÚNICAMENTE con un JSON válido con esta estructura (sin texto extra, 
 """
 
 
-def generate_plan_with_claude(goal_text: str) -> dict:
-    """Llama a la Claude API y devuelve el plan como dict."""
-    import urllib.request, json as _json
-
-    payload = _json.dumps({
-        "model": "claude-fable-5",
-        "max_tokens": 1024,
-        "system": "Respondé siempre en español rioplatense. Sé empático, claro y motivador. Usá ejemplos de la vida cotidiana. Máximo 3 párrafos por respuesta.",
-        "messages": [
-            {"role": "user", "content": PLAN_PROMPT.format(goal_text=goal_text)}
-        ],
-    }).encode()
-
-    req = urllib.request.Request(
-        "https://api.anthropic.com/v1/messages",
-        data=payload,
-        headers={
-            "Content-Type": "application/json",
-            "x-api-key": settings.ANTHROPIC_API_KEY,
-            "anthropic-version": "2023-06-01",
-        },
-        method="POST",
+def generate_plan_with_ai(goal_text: str) -> dict:
+    """Llama al proveedor de IA configurado y devuelve el plan como dict."""
+    ai = get_ai_provider()
+    raw_text = ai.complete(
+        system=PLAN_SYSTEM,
+        prompt=PLAN_PROMPT.format(goal_text=goal_text),
+        max_tokens=settings.GOALS_PLAN_MAX_TOKENS,
     )
-
-    with urllib.request.urlopen(req, timeout=30) as resp:
-        data = _json.loads(resp.read())
-
-    raw_text = ""
-    for block in data.get("content", []):
-        if block.get("type") == "text":
-            raw_text = block.get("text", "")
-            break
 
     # Limpiar posibles markdown fences
     raw_text = raw_text.strip()
@@ -87,7 +67,7 @@ def generate_plan_with_claude(goal_text: str) -> dict:
             raw_text = raw_text[4:]
     raw_text = raw_text.strip()
 
-    return _json.loads(raw_text)
+    return json.loads(raw_text)
 
 
 # ── YouTube Data API v3 ───────────────────────────────────────────────────────
