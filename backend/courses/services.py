@@ -99,7 +99,7 @@ class AnthropicService:
         )
 
         payload = json.dumps({
-            "model": "claude-fable-5",
+            "model": "claude-sonnet-4-6",
             "max_tokens": 4000,
             "system": "Eres un tutor empático y estructurado que responde estrictamente en formato JSON válido.",
             "messages": [
