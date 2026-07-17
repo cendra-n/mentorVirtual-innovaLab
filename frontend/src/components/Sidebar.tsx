@@ -9,9 +9,14 @@ interface Props {
   onAdmin?: () => void
 }
 
+// Se usa \u{1F3E0} (escape Unicode) en vez del glifo '⌂' plano: el
+// glifo simple desentonaba al lado de los demás emojis a color, y
+// además los emojis en texto plano se corrompen fácil al guardar el
+// archivo con un encoding distinto a UTF-8. Mismo criterio que ya se
+// aplicó en MobileNav.tsx.
 const NAV = [
   { id: 'chat',      icon: '🤖', label: 'Chatea con Pulso' },
-  { id: 'inicio',    icon: '⌂', label: 'Inicio' },
+  { id: 'inicio',    icon: '\u{1F3E0}', label: 'Inicio' },
   { id: 'lecciones', icon: '📖', label: 'Lecciones' },
   { id: 'desafios',  icon: '🏆', label: 'Desafíos' },
   { id: 'logros',    icon: '⭐', label: 'Logros' },
