@@ -1,34 +1,57 @@
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
-from rest_framework import permissions
-from drf_spectacular.utils import extend_schema 
-from rest_framework import status
-from enrollment.permissions import IsOwnerOrAdmin
-from .permissions import get_user_role  
-from .db import get_available_courses
-from .db import enroll_student_in_course
-from .db import get_all_enrollments_db
-from .serializers import CourseAvailableListSerializer, EnrollmentCreateSerializer
-from .serializers import EnrollmentListSerializer
-from .pagination import StandardResultsSetPagination
+from rest_framework import serializers, status, permissions
+from drf_spectacular.utils import extend_schema, OpenApiParameter, inline_serializer
 
-#------------------GET/coursesActive
+from .serializers import CourseAvailableListSerializer, EnrollmentCreateSerializer, EnrollmentListSerializer
+from .pagination import StandardResultsSetPagination
+from enrollment.permissions import IsOwnerOrAdmin
+from .permissions import get_user_role
+from .db import get_available_courses, enroll_student_in_course, get_all_enrollments_db
+from .db import get_my_enrollments_db
+from .serializers import EnrollmentListSerializerStudent
+
+
+#------------------GET/coursesActive 
+#Los 3 roles pueden acceder a ver la lista de courses activos. 
 class AvailableCoursesAPIView(APIView):
-    #Los 3 roles pueden ver la lista de cursos activos solo se valida que la persona este logeada
+    
     permission_classes = [IsAuthenticated]
 
     @extend_schema(
-        summary="Lista de cursos disponibles",
-        description="Devuelve una lista de todos los cursos activos.",
-        responses={200: CourseAvailableListSerializer(many=True)}
+            tags=['enrollment'],
+            summary="Lista de cursos disponibles activados",
+            description="Devuelve una lista paginada de todos los cursos activos para usuarios autenticados.",
+            parameters=[
+                OpenApiParameter(
+                    name='page', 
+                    type=int, 
+                    location=OpenApiParameter.QUERY, 
+                    required=False, 
+                    default=1,
+                    description='Número de página a consultar. Por defecto es la página 1'
+                )
+       ],
+        responses={
+            200: inline_serializer(
+                name='PaginatedCourseList',
+                fields={
+                    'count': serializers.IntegerField(),
+                    'total_pages': serializers.IntegerField(),
+                    'next': serializers.URLField(allow_null=True),
+                    'previous': serializers.URLField(allow_null=True),
+                    'results': CourseAvailableListSerializer(many=True)
+                }
+            )
+        }
     )
     def get(self, request):
-        # 1. Obtener la lista cruda
+
         courses = get_available_courses()
-        
-        # 2. Paginar
+    
         paginator = StandardResultsSetPagination()
+
         page = paginator.paginate_queryset(courses, request, view=self)
         
         if page is not None:
@@ -36,7 +59,13 @@ class AvailableCoursesAPIView(APIView):
             return paginator.get_paginated_response(serializer.data)
             
         serializer = CourseAvailableListSerializer(courses, many=True)
-        return Response(serializer.data)
+        return Response({
+            'count': len(courses),
+            'total_pages': 1,
+            'next': None,
+            'previous': None,
+            'results': serializer.data
+        })
         
 
 #------------------Post/enrollmentStudent
@@ -101,14 +130,14 @@ class ListEnrollmentsAPIView(APIView):
     )
     def get(self, request):
         user = request.user
-        
-        # 1. VALIDACIÓN EXPLÍCITA DE ROL
-        # Usamos tu función auxiliar get_user_role definida en tu archivo
+       
+       # 1. VALIDACIÓN EXPLÍCITA DE ROL
         role = get_user_role(user)
         
         # AGREGA ESTA LÍNEA Y MIRA LA TERMINAL DE DOCKER
-        print(f"DEBUG: El usuario {user.username} fue detectado con rol: {role}")
-        
+        print("DEBUG: Entrando a la vista, rol detectado:", get_user_role(request.user))
+
+       
         if role not in ['ADMIN', 'PROFESSOR']:
             return Response(
                 {"detail": "Si no es Admin o profesor, no puede visualizar este contenido."},
@@ -132,3 +161,38 @@ class ListEnrollmentsAPIView(APIView):
         
         # 4. RESPUESTA
         return Response(serializer.data, status=status.HTTP_200_OK)
+
+#---------------Get /lista de cursos particular de cada alumno, solo disponible para el rol student
+class MyEnrollmentsListView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    @extend_schema(
+        summary="Cursos particulares del alumno",
+        description="Devuelve la lista de cursos en los que el estudiante autenticado está inscrito. Solo disponible para el rol student",
+        responses={200: EnrollmentListSerializerStudent(many=True)}
+    )
+    def get(self, request):
+        # 1. Validación de ROL
+        try:
+            user_role = request.user.profile.role 
+        except AttributeError:
+            return Response(
+                {"detail": "Error: usuario sin perfil de alumno asignado."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        if user_role != 'STUDENT':
+            return Response(
+                {"detail": "Error: solo puedes consultar tus cursos, si tu rol es estudiante."},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        # 2. Obtener los datos usando la función de base de datos
+        my_courses = get_my_enrollments_db(request.user.email)
+        
+        # 3. Serializar usando el serializador específico
+        serializer = EnrollmentListSerializerStudent(my_courses, many=True)
+        
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+    

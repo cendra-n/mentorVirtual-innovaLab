@@ -3,16 +3,17 @@ from rest_framework import exceptions
 
 def get_user_role(user):
     """
-     Me logie desde swagger como alumno y me puso como student y is_staff_true.
-       Como no se donde origina ese cambio, 
-       cambie los permisos aca solamente para "ENROLLMENT"
+     Me logie desde swagger como alumno sofia14 y me puso como student y is_staff_true.
+       Como no se donde origina ese cambio, puse is_staff_false desde la consola
+       cambie los permisos aca solamente para "ENROLLMENT en la lista de inscriptos"
     """
     if not user or not user.is_authenticated:
         return 'STUDENT'
     
-    # Quitamos is_staff de aquí si no quieres que cualquier staff sea admin
-    if user.is_superuser:
-        return 'ADMIN'
+    #Tuve que quitar este bloque porque sino seguia retornando el user sofia14 como admin en consola y como student en swagger 
+    # # Quitamos is_staff de aquí si no quieres que cualquier staff sea admin
+    # if user.is_superuser:
+    #     return 'ADMIN'
         
     return getattr(user.profile, 'role', 'STUDENT') if hasattr(user, 'profile') else 'STUDENT'
 

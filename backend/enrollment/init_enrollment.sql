@@ -49,32 +49,42 @@ $$ LANGUAGE plpgsql;
 DROP FUNCTION IF EXISTS sp_enroll_student(INTEGER, INTEGER);
 
 -- SP 2: Inscripción con validación de límite (Máximo 3) si a futuro se cambia, solo se modifica este archivo
-CREATE OR REPLACE FUNCTION sp_enroll_student(p_student_id INTEGER, p_course_id INTEGER) 
+-- SP: Inscripción con validación de límite (3 cursos) y unicidad (no pisar inscripciones)
+CREATE OR REPLACE FUNCTION sp_enroll_student(p_student_id INTEGER, p_course_id INTEGER)
 RETURNS INTEGER AS $$
 DECLARE
     v_enrollment_id INTEGER;
     v_is_active BOOLEAN;
     v_count INTEGER;
 BEGIN
+    -- Validar si el curso existe y está activo
     SELECT is_active INTO v_is_active FROM courses WHERE id = p_course_id;
-    
+
     IF v_is_active IS NULL THEN
         RAISE EXCEPTION 'COURSE_NOT_FOUND' USING ERRCODE = 'P0002';
     ELSIF v_is_active = FALSE THEN
         RAISE EXCEPTION 'COURSE_NOT_ACTIVE' USING ERRCODE = 'P0010';
     END IF;
 
-    SELECT COUNT(*) INTO v_count FROM enrollment_enrollment 
+    -- Validar si ya está inscrito en este curso
+    SELECT COUNT(*) INTO v_count FROM enrollment_enrollment
+    WHERE student_id = p_student_id AND course_id = p_course_id AND status = 'active';
+
+    IF v_count > 0 THEN
+        RAISE EXCEPTION 'UNIQUE_STUDENT_COURSE' USING ERRCODE = 'P0011';
+    END IF;
+
+    -- Validar límite de 3 cursos
+    SELECT COUNT(*) INTO v_count FROM enrollment_enrollment
     WHERE student_id = p_student_id AND status = 'active';
 
     IF v_count >= 3 THEN
-        RAISE EXCEPTION 'LIMIT_REACHED' USING ERRCODE = 'P0011';
+        RAISE EXCEPTION 'LIMIT_REACHED' USING ERRCODE = 'P0012';
     END IF;
 
+    -- Insertar nueva inscripción
     INSERT INTO enrollment_enrollment (student_id, course_id, status, enrolled_at)
     VALUES (p_student_id, p_course_id, 'active', now())
-    ON CONFLICT (student_id, course_id) 
-    DO UPDATE SET status = 'active', enrolled_at = now()
     RETURNING id INTO v_enrollment_id;
 
     RETURN v_enrollment_id;
@@ -82,6 +92,7 @@ END;
 $$ LANGUAGE plpgsql;
 
 DROP FUNCTION IF EXISTS sp_get_all_enrollments();
+
 -- SP 3: Obtener lista consolidada de inscripciones
 
 CREATE OR REPLACE FUNCTION sp_get_all_enrollments()
@@ -99,3 +110,32 @@ BEGIN
     INNER JOIN auth_user u_prof ON c.professor_id = u_prof.id;
 END;
 $$ LANGUAGE plpgsql;
+
+DROP FUNCTION IF EXISTS sp_get_my_enrollments(VARCHAR);
+
+-- SP 4 : obtener los cursos del alumno que esta autenticado en este momento
+
+CREATE OR REPLACE FUNCTION sp_get_my_enrollments(p_student_email VARCHAR)
+RETURNS TABLE (
+    enrollment_id INTEGER, 
+    student_email VARCHAR, 
+    course_name VARCHAR, 
+    professor_name VARCHAR
+) AS $$
+BEGIN
+    RETURN QUERY
+    SELECT 
+        e.id::INTEGER,
+        u_student.email::VARCHAR,
+        c.title::VARCHAR,
+        u_prof.username::VARCHAR
+    FROM enrollment_enrollment e
+    INNER JOIN auth_user u_student ON e.student_id = u_student.id
+    INNER JOIN courses c ON e.course_id = c.id
+    INNER JOIN auth_user u_prof ON c.professor_id = u_prof.id
+    WHERE u_student.email = p_student_email; -- Aquí filtramos usando el email de auth_user
+END;
+$$ LANGUAGE plpgsql;
+
+        
+      

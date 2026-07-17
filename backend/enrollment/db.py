@@ -1,5 +1,6 @@
 from django.db import connection, transaction
 from rest_framework.exceptions import ValidationError
+from .models import Enrollment
 import logging
 
 logger = logging.getLogger(__name__)
@@ -40,8 +41,8 @@ def enroll_student_in_course(student_id: int, course_id: int) -> int:
                     raise ValidationError({"course_id": "Error, no hay cursos con este id."})
                 elif "COURSE_NOT_ACTIVE" in error_msg:
                     raise ValidationError({"course_id": "Error, no puedes anotarte en un curso inactivo."})
-                elif "unique_student_course" in error_msg:
-                    raise ValidationError({"course_id": "Ya estas anotado en este curso."})
+                elif "UNIQUE_STUDENT_COURSE" in error_msg:
+                    raise ValidationError({"course_id": "Ya estas anotado en este curso."}) 
                 else:
                     # El usuario solo ve esto, pero el error real queda guardado en el log
                     raise ValidationError({"Detalles": "Error inesperado.Por favor intente nuevamente"})
@@ -70,4 +71,27 @@ def get_all_enrollments_db() -> list:
         logger.error(f"Error al obtener lista consolidada de inscripciones: {e}")
         # Retornamos una lista vacía para evitar romper el flujo del front-end
         return []
+    
+
+#Endpoint donde el alumno podra ver los cursos a los que esta inscripto
+
+def get_my_enrollments_db(student_email):
+    """
+    Llama al procedimiento almacenado sp_get_my_enrollments para obtener 
+    los cursos del estudiante autenticado.
+    """
+    results = []
+    # Usamos la conexión de Django para ejecutar el procedimiento
+    with connection.cursor() as cursor:
+        # Llamamos a la función de Postgres como si fuera un SELECT
+        cursor.execute("SELECT * FROM sp_get_my_enrollments(%s)", [student_email])
+        
+        # Obtenemos los nombres de las columnas
+        columns = [col[0] for col in cursor.description]
+        
+        # Convertimos cada fila en un diccionario usando el nombre de la columna
+        for row in cursor.fetchall():
+            results.append(dict(zip(columns, row)))
+            
+    return results  
                 
