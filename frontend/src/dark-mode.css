@@ -1,0 +1,264 @@
+/* ── Dark mode ──────────────────────────────────────────────────────────────
+   Se activa agregando la clase "dark-mode" al <body> (ver PreferenciasCard.tsx,
+   que hace document.body.classList.toggle('dark-mode', modoOscuro)).
+
+   Solo redefine variables — el resto del CSS del proyecto ya está armado
+   con var(--...), así que no hace falta tocar nada más.
+
+   Si UX/UI pide otra paleta para el modo oscuro, ESTE es el único
+   archivo a modificar: cambiá los valores de acá abajo y se propaga
+   solo a toda la app.
+*/
+
+body.dark-mode {
+  --azul:         #4C8DFF;
+  --azul-dark:    #2F6FE0;
+  --marino:       #E8ECF3;
+  --teal:         #2FB8D6;
+  --verde:        #4CAF6E;
+  --gris-claro:   #1B2436;
+  --gris-borde:   #263047;
+  --gris-medio:   #8B93A7;
+  --blanco:       #131C2E;
+  --azul-sutil:   #1E2E4D;
+  --amarillo:     #F5B84D;
+  --rojo:         #F16767;
+  --fondo-auth:   #0B1220;
+}
+
+/* Fondos de página: en modo claro usan --gris-claro o --fondo-auth,
+   que ya quedaron redefinidos arriba, pero los que usan blanco/gris-claro
+   fijo (no variable) necesitan este empujón puntual. */
+body.dark-mode {
+  background: #0B1220;
+}
+body.dark-mode .dashboard,
+body.dark-mode .auth-page,
+body.dark-mode .profile-page,
+body.dark-mode .chatpage-main,
+body.dark-mode .chatpage-sidebar,
+body.dark-mode .sidebar,
+body.dark-mode .dashboard-right,
+body.dark-mode .tutor-page,
+body.dark-mode .admin-panel {
+  background: #0B1220;
+}
+
+/* Cards y superficies que usan "white" fijo en vez de var(--blanco) */
+body.dark-mode .goal-card,
+body.dark-mode .profile-card,
+body.dark-mode .step-card,
+body.dark-mode .stat-box,
+body.dark-mode .user-detail-panel,
+body.dark-mode .video-card,
+body.dark-mode .tutor-book-card,
+body.dark-mode .auth-card,
+body.dark-mode .login-card,
+body.dark-mode .modal,
+body.dark-mode .tutor-bubble-body,
+body.dark-mode .tutor-float-chat {
+  background: var(--blanco);
+}
+
+/* Inputs */
+body.dark-mode .form-input,
+body.dark-mode .auth-input,
+body.dark-mode .form-select {
+  background: var(--blanco);
+  color: var(--marino);
+  border-color: var(--gris-borde);
+}
+
+/* El botón primario usaba fondo var(--marino) (que en dark queda claro)
+   con texto blanco fijo — mala combinación, y encima al invertirlo se
+   veía como un botón "fantasma" claro en medio de una UI oscura.
+   Se unifica a usar el azul de acento, más consistente. */
+body.dark-mode .btn-primary,
+body.dark-mode .btn-primary-sm {
+  background: var(--azul);
+  color: #FFFFFF;
+}
+body.dark-mode .btn-primary:hover {
+  background: var(--azul-dark);
+}
+
+/* Botón "Editar perfil" y similares: fondo blanco fijo + texto que en
+   dark queda claro = invisible. */
+body.dark-mode .btn-outline-sm {
+  background: var(--blanco);
+  color: var(--marino);
+}
+
+/* Ícono de la campana: fondo blanco fijo, por eso se veía igual en
+   los dos modos. */
+body.dark-mode .icon-btn {
+  background: var(--blanco);
+  border-color: var(--gris-borde);
+}
+
+/* Botón "+" del chat: mismo problema que btn-primary (fondo var(--marino)
+   + texto blanco fijo). */
+body.dark-mode .chatpage-input-plus {
+  background: var(--azul);
+  color: #FFFFFF;
+}
+
+/* Ojito de mostrar/ocultar contraseña: no tenía color explícito y
+   dependía de heredar currentColor, quedando invisible o muy tenue
+   sobre fondo oscuro. */
+body.dark-mode .toggle-pass,
+body.dark-mode .auth-input-toggle {
+  color: var(--marino);
+  opacity: .8;
+}
+
+
+/* Header de auth y mentor-chat usan "white" fijo */
+body.dark-mode .auth-header,
+body.dark-mode .chat-header,
+body.dark-mode .tutor-sidebar,
+body.dark-mode .tutor-sidebar-header,
+body.dark-mode .tutor-chat-header,
+body.dark-mode .tutor-input-row,
+body.dark-mode .chatpage-input-row,
+body.dark-mode .admin-header {
+  background: var(--blanco);
+}
+
+/* ── Elementos con colores fijos (no variables) que no reaccionaban
+   al cambio de tema — hay que forzarlos acá explícitamente. ── */
+
+/* Hero banner: tenía un gradiente en hex fijo (#EEF4FF/#E8F5FF), texto
+   claro sobre eso quedaba invisible. */
+body.dark-mode .hero-banner {
+  background: linear-gradient(135deg, #16213a 0%, #131c2e 100%);
+  border-color: var(--gris-borde);
+}
+
+/* Week streak: fondo var(--marino) (que en dark queda claro) + texto
+   blanco fijo = invisible. Se fuerza fondo oscuro real. */
+body.dark-mode .week-streak {
+  background: #0B1220;
+  color: #E8ECF3;
+}
+body.dark-mode .week-day-box {
+  border-color: rgba(255,255,255,.15);
+}
+
+/* Círculos de avatar/inicial: mismo problema (fondo var(--marino) +
+   texto blanco fijo). */
+body.dark-mode .avatar-circle,
+body.dark-mode .profile-avatar,
+body.dark-mode .user-avatar {
+  background: #4C8DFF;
+  color: #0B1220;
+}
+
+/* Anillo de progreso: el círculo interior tenía blanco fijo. */
+body.dark-mode .progress-ring-inner {
+  background: var(--blanco);
+  color: var(--marino);
+}
+
+/* Barra de título de Perfil ("Mi Perfil"): fondo blanco fijo. */
+body.dark-mode .profile-header {
+  background: var(--blanco);
+}
+
+/* Chrome (y otros navegadores) fuerzan un fondo claro en campos que
+   autocompletaron con el gestor de contraseñas guardadas, ignorando
+   el CSS normal. Este truco (transition delay gigante + box-shadow
+   inset) es el workaround estándar para neutralizarlo. */
+body.dark-mode input:-webkit-autofill,
+body.dark-mode input:-webkit-autofill:hover,
+body.dark-mode input:-webkit-autofill:focus {
+  -webkit-text-fill-color: var(--marino);
+  -webkit-box-shadow: 0 0 0px 1000px var(--blanco) inset;
+  transition: background-color 5000s ease-in-out 0s;
+}
+
+/* Textarea del modal de "Nueva meta": el estado :focus forzaba
+   background: white fijo, así que quedaba blanco apenas se abría
+   el modal (que enfoca el campo automáticamente). */
+body.dark-mode .modal-textarea,
+body.dark-mode .modal-textarea:focus {
+  background: var(--gris-claro);
+  color: var(--marino);
+}
+
+/* Fila de input de los distintos chats (Dashboard, ChatPage, Tutor,
+   flotante): no tenían fondo definido en el CSS original, así que
+   podían heredar blanco del navegador o de un ancestro. Se fuerza
+   explícitamente acá. */
+body.dark-mode .chatpage-input-row,
+body.dark-mode .chat-input-row,
+body.dark-mode .tutor-input-row,
+body.dark-mode .tutor-float-input-row {
+  background: var(--blanco);
+}
+
+/* Red de seguridad general: cualquier input/textarea suelto que no
+   tenga una clase específica ya cubierta arriba, para que nunca
+   quede con el fondo blanco por default del navegador. */
+body.dark-mode input,
+body.dark-mode textarea,
+body.dark-mode select {
+  background: var(--blanco);
+  color: var(--marino);
+}
+
+/* Botón "Atrás" del onboarding: fondo blanco fijo + texto que en dark
+   queda claro = washed out (texto claro sobre fondo claro). */
+body.dark-mode .onboarding-btn-back {
+  background: var(--blanco);
+  color: var(--gris-medio);
+  border-color: var(--gris-borde);
+}
+
+/* Botón "Iniciar Sesión"/"Registrarse" del header de auth: mismo
+   problema que btn-primary (fondo var(--marino) que en dark queda
+   claro + texto blanco fijo = washed out). Se unifica al azul de
+   acento, igual criterio que el resto de los botones primarios. */
+body.dark-mode .auth-header-btn,
+body.dark-mode .auth-header-btn--active {
+  background: var(--azul);
+  color: #FFFFFF;
+}
+body.dark-mode .auth-header-btn:hover,
+body.dark-mode .auth-header-btn--active:hover {
+  background: var(--azul-dark);
+}
+
+/* Botón de Google: fondo blanco fijo (no variable) + texto que en
+   dark queda claro = pálido e ilegible. */
+body.dark-mode .auth-google-btn {
+  background: var(--blanco);
+  color: var(--marino);
+  border-color: var(--gris-borde);
+}
+
+/* Ícono del logo "Impulsa": fondo var(--marino) (que en dark queda
+   claro) + ícono blanco fijo = mancha pálida junto al texto. Mismo
+   criterio que el resto de los íconos/botones: azul de acento. */
+body.dark-mode .auth-header-logo-icon {
+  background: var(--azul);
+  color: #FFFFFF;
+}
+
+/* "Registrarse" (botón secundario del header): antes quedaba muy
+   parecido a "Iniciar Sesión" en dark mode (ambos tonos de azul
+   similares) y el :hover casi no se notaba. Se le da un fondo bien
+   distinto (superficie de card oscura) para que ambos botones se
+   diferencien claramente, con su propio hover marcado. */
+body.dark-mode .auth-header-btn--secondary,
+body.dark-mode .auth-header-btn--secondary-active {
+  background: var(--blanco);
+  color: var(--marino);
+  border: 1px solid var(--gris-borde);
+}
+body.dark-mode .auth-header-btn--secondary:hover,
+body.dark-mode .auth-header-btn--secondary-active:hover {
+  background: var(--azul);
+  color: #FFFFFF;
+  border-color: var(--azul);
+}

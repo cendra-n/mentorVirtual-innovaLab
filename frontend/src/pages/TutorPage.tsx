@@ -58,6 +58,11 @@ export default function TutorPage() {
   const [uploading, setUploading]   = useState(false)
   const [uploadMsg, setUploadMsg]   = useState('')
 
+  // En mobile, .tutor-sidebar (libros + botón de subir PDF) se oculta
+  // por default para no romper el layout. Este estado controla si se
+  // muestra como panel deslizable encima del chat (ver chat.css).
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false)
+
   // Upload form
   const [title, setTitle]     = useState('')
   const [subject, setSubject] = useState('')
@@ -104,6 +109,7 @@ export default function TutorPage() {
 
   const handleSelectBook = (book: Book) => {
     setSelectedBook(book)
+    setMobileSidebarOpen(false)
     setMessages([{
       from: 'bot',
       text: `¡Hola! Cargué el libro "${book.title}". ¿Qué querés aprender hoy? Podés preguntarme cualquier cosa que esté en este material.`,
@@ -151,12 +157,37 @@ export default function TutorPage() {
   return (
     <div className="tutor-page">
 
+      {/* Botón para abrir el panel de libros en mobile. Solo se ve
+          en pantallas chicas (ver .tutor-mobile-toggle en chat.css). */}
+      <button
+        className="tutor-mobile-toggle"
+        onClick={() => setMobileSidebarOpen(true)}
+      >
+        📚 Mis libros
+      </button>
+
+      {/* Fondo oscuro detrás del panel cuando está abierto en mobile */}
+      {mobileSidebarOpen && (
+        <div
+          className="tutor-mobile-backdrop"
+          onClick={() => setMobileSidebarOpen(false)}
+        />
+      )}
+
       {/* ── Panel izquierdo: libros ── */}
-      <div className="tutor-sidebar">
+      <div className={`tutor-sidebar ${mobileSidebarOpen ? 'tutor-sidebar--mobile-open' : ''}`}>
         <div className="tutor-sidebar-header">
           <h2 className="tutor-sidebar-title">📚 Mis libros</h2>
           <button className="btn-primary" onClick={() => setShowUpload(true)}>
             + Subir PDF
+          </button>
+          {/* Solo visible en mobile, cuando el panel está abierto */}
+          <button
+            className="tutor-mobile-close"
+            onClick={() => setMobileSidebarOpen(false)}
+            aria-label="Cerrar"
+          >
+            ✕
           </button>
         </div>
 

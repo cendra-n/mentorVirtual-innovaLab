@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import Sidebar from '../components/Sidebar'
+import MobileNav from '../components/MobileNav'
 import MentorChat from '../components/MentorChat'
 import GoalCard from '../components/GoalCard'
 import WeekStreak from '../components/WeekStreak'
@@ -77,6 +78,7 @@ export default function Dashboard({ onLogout }: Props) {
           <WeekStreak currentStreak={streak.current_streak} longestStreak={streak.longest_streak} lastActivity={streak.last_activity} />
           <MentorChat />
         </div>
+        <MobileNav active={activePage} onNav={(p) => { setShowAdmin(false); setActivePage(p) }} />
       </div>
     )
   }
@@ -105,6 +107,7 @@ export default function Dashboard({ onLogout }: Props) {
           />
           <MentorChat />
         </div>
+        <MobileNav active={activePage} onNav={(p) => { setActivePage(p); setSelectedGoal(null) }} />
       </div>
     )
   }
@@ -121,7 +124,7 @@ export default function Dashboard({ onLogout }: Props) {
       />
 
       <main className="dashboard-main">
-        {activePage === 'perfil' && <Profile user={user} />}
+        {activePage === 'perfil' && <Profile user={user} onLogout={onLogout} />}
         {activePage === 'lecciones' && <TutorPage />}
         {activePage === 'chat' && <ChatPage />}
         {activePage !== 'perfil' && activePage !== 'lecciones' && activePage !== 'chat' && <>
@@ -198,6 +201,14 @@ export default function Dashboard({ onLogout }: Props) {
           loading={goalLoading}
         />
       )}
+
+      {activePage !== 'perfil' && activePage !== 'lecciones' && activePage !== 'chat' && (
+        <button className="mobile-fab-cta" onClick={() => setShowModal(true)}>
+          {goals.length > 0 ? '🤖 Nueva meta' : '✨ Crear mi primer plan'}
+        </button>
+      )}
+
+      <MobileNav active={activePage} onNav={setActivePage} />
     </div>
   )
 }
