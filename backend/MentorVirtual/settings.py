@@ -43,7 +43,7 @@ INSTALLED_APPS = [
     'goals',
     'courses',
     'progress',
-    'enrollment'
+    'enrollment',
 ]
 
 MIDDLEWARE = [

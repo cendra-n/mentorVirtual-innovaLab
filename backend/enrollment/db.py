@@ -1,106 +1,73 @@
 from django.db import connection, transaction
 from rest_framework.exceptions import ValidationError
+import logging
 
-def get_available_courses():
-    """
-    Obtiene todos los cursos activos que estan listos para que los alumnos se inscriban.
-    """
-    with connection.cursor() as cursor:
-        query = """
-            SELECT c.id, c.title, c.description, c.level, c.discipline, 
-                   c.objectives, c.cover_image, u.username AS professor_name
-            FROM courses_course c
-            INNER JOIN auth_user u ON c.professor_id = u.id
-            WHERE c.is_active = 1
-        """
-        cursor.execute(query)
-        columns = [col[0] for col in cursor.description]
-        return [dict(zip(columns, row)) for row in cursor.fetchall()]
+logger = logging.getLogger(__name__)
 
+# Función de utilidad (debe ir aquí para que todas las demás la vean)
+def _rows_as_dicts(cursor):
+    """Convierte las filas de un cursor de SQL en una lista de diccionarios."""
+    columns = [col[0] for col in cursor.description]
+    return [dict(zip(columns, row)) for row in cursor.fetchall()]
 
+#Lista todos los cursos disponibles is_active=true/ disponible para los 3 roles
+def get_available_courses() -> list[dict]:
+    with connection.cursor() as cur:
+        cur.execute("SELECT * FROM sp_get_available_courses()")
+        data = _rows_as_dicts(cur)
+        print("DEBUG: Datos recibidos desde DB:", data) # <-- Esto aparecerá en los logs del contenedor
+        return data
+
+#Endpoint para que el alumno se anota a un curso activo con validación de 3 incluida desde el sp.   
 def enroll_student_in_course(student_id: int, course_id: int) -> int:
-    """
-    Inscribe a un alumno en un curso activo, aplicando de forma estricta los limites de negocio.
-    Retorna el ID de la inscripcion generada.
-    """
+    """Inscribe a un alumno aplicando las reglas de negocio."""
     with transaction.atomic():
         with connection.cursor() as cursor:
-            # 1. Validar si el curso existe y esta activo
-            cursor.execute(
-                "SELECT is_active FROM courses_course WHERE id = %s", 
-                [course_id]
-            )
-            course_row = cursor.fetchone()
-            
-            if not course_row:
-                raise ValidationError({"course_id": "The requested course does not exist."})
-            
-            if not course_row[0]:  # is_active == False
-                raise ValidationError({"course_id": "Cannot enroll in an inactive course."})
 
-            # 2. Evitar duplicados (que el alumno se anote dos veces al mismo curso)
-            cursor.execute(
-                """
-                SELECT id FROM enrollment_enrollment 
-                WHERE student_id = %s AND course_id = %s AND status = 'active'
-                """,
-                [student_id, course_id]
-            )
-            if cursor.fetchone():
-                raise ValidationError({"course_id": "You are already actively enrolled in this course."})
+            # 1. Llamada al SP de inscripción (ahora es el único validador)
+            try:
+                cursor.execute("SELECT sp_enroll_student(%s, %s);", [student_id, course_id])
+                result = cursor.fetchone()
+                return result[0] if result else None
+            except Exception as e:
+                # Aquí logueas el error real para que lo veas en tus archivos de log
+                logger.error(f"Error crítico en la inscripción: {str(e)}")
 
-            # 3. Validar el tope maximo del alumno (Maximo 3 inscripciones activas)
-            cursor.execute(
-                "SELECT COUNT(*) FROM enrollment_enrollment WHERE student_id = %s AND status = 'active'",
-                [student_id]
-            )
-            active_enrollments_count = cursor.fetchone()[0]
-            if active_enrollments_count >= 3:
-                raise ValidationError({"detail": "You have reached the maximum limit of 3 active enrollments."})
+                error_msg = str(e)
+                if "LIMIT_REACHED" in error_msg:
+                    raise ValidationError({"detail": "Solo puedes estar anotado en 3 cursos."})
+                elif "COURSE_NOT_FOUND" in error_msg:
+                    raise ValidationError({"course_id": "Error, no hay cursos con este id."})
+                elif "COURSE_NOT_ACTIVE" in error_msg:
+                    raise ValidationError({"course_id": "Error, no puedes anotarte en un curso inactivo."})
+                elif "unique_student_course" in error_msg:
+                    raise ValidationError({"course_id": "Ya estas anotado en este curso."})
+                else:
+                    # El usuario solo ve esto, pero el error real queda guardado en el log
+                    raise ValidationError({"Detalles": "Error inesperado.Por favor intente nuevamente"})
 
-            # 4. Insertar la inscripcion en la base de datos
-            insert_query = """
-                INSERT INTO enrollment_enrollment (student_id, course_id, status, enrolled_at)
-                VALUES (%s, %s, 'active', NOW())
-            """
-            cursor.execute(insert_query, [student_id, course_id])
-            
-            # Obtener el ID autoincremental generado por la insercion
-            cursor.execute("SELECT LAST_INSERT_ID()") 
-            enrollment_id = cursor.fetchone()[0]
-            
-            return enrollment_id
-
-
-def get_student_dashboard_data(student_id: int):
+#lista de inscripciones en la view se separara por rol lo que puede ver admin y proffesor
+def get_all_enrollments_db() -> list:
     """
-    Obtiene el perfil del alumno y la lista de los cursos a los que se ha inscrito,
-    incluyendo el ID del curso, titulo y el nombre del profesor de forma indirecta.
+    Ejecuta el SP para obtener todas las inscripciones con sus detalles.
+    Retorna una lista de diccionarios con:
+    enrollment_id, student_email, course_name, professor_name.
     """
-    with connection.cursor() as cursor:
-        # 1. Traer los datos basicos del alumno
-        cursor.execute("SELECT id, username, email FROM auth_user WHERE id = %s", [student_id])
-        student_row = cursor.fetchone()
-        if not student_row:
-            return None
-        
-        # 2. Traer los cursos inscritos cruzando tablas (JOIN) para obtener el profesor
-        query_courses = """
-            SELECT c.id AS course_id, c.title AS course_title, u.username AS professor_name, e.enrolled_at
-            FROM enrollment_enrollment e
-            INNER JOIN courses_course c ON e.course_id = c.id
-            INNER JOIN auth_user u ON c.professor_id = u.id
-            WHERE e.student_id = %s AND e.status = 'active'
-        """
-        cursor.execute(query_courses, [student_id])
-        columns_courses = [col[0] for col in cursor.description]
-        enrolled_courses = [dict(zip(columns_courses, row)) for row in cursor.fetchall()]
-        
-        # 3. Armar la estructura final de respuesta
-        return {
-            "student_id": student_row[0],
-            "student_username": student_row[1],
-            "student_email": student_row[2],
-            "enrolled_courses_count": len(enrolled_courses),
-            "enrolled_courses": enrolled_courses
-        }
+    try:
+        with connection.cursor() as cursor:
+            # Llamamos al procedimiento almacenado que creamos en init_enrollment.sql
+            cursor.execute("SELECT * FROM sp_get_all_enrollments();")
+            
+            # Obtenemos los nombres de las columnas que retorna el SP
+            columns = [col[0] for col in cursor.description]
+            
+            # Convertimos cada fila en un diccionario usando los nombres de columnas
+            results = [dict(zip(columns, row)) for row in cursor.fetchall()]
+            return results
+            
+    except Exception as e:
+        # Registramos el error internamente de forma segura
+        logger.error(f"Error al obtener lista consolidada de inscripciones: {e}")
+        # Retornamos una lista vacía para evitar romper el flujo del front-end
+        return []
+                

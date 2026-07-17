@@ -1,91 +1,134 @@
 from rest_framework.views import APIView
 from rest_framework.response import Response
-from rest_framework import status, permissions
-from drf_spectacular.utils import extend_schema
+from rest_framework.permissions import IsAuthenticated
+from rest_framework import permissions
+from drf_spectacular.utils import extend_schema 
+from rest_framework import status
+from enrollment.permissions import IsOwnerOrAdmin
+from .permissions import get_user_role  
+from .db import get_available_courses
+from .db import enroll_student_in_course
+from .db import get_all_enrollments_db
+from .serializers import CourseAvailableListSerializer, EnrollmentCreateSerializer
+from .serializers import EnrollmentListSerializer
+from .pagination import StandardResultsSetPagination
 
-# Importamos nuestro archivo de base de datos y los serializadores
-from enrollment import db as enrollment_db
-from enrollment.serializers import (
-    CourseAvailableListSerializer, 
-    EnrollmentCreateSerializer, 
-    StudentDashboardSerializer
-)
-
+#------------------GET/coursesActive
 class AvailableCoursesAPIView(APIView):
-    """
-    Vista de la API para que los alumnos listen los cursos disponibles.
-    """
-    permission_classes = [permissions.IsAuthenticated] # Requiere token de autenticacion
+    #Los 3 roles pueden ver la lista de cursos activos solo se valida que la persona este logeada
+    permission_classes = [IsAuthenticated]
 
     @extend_schema(
-        summary="List available courses",
-        description="Devuelve una lista de todos los cursos activos que han sido aprobados por el administrador.",
+        summary="Lista de cursos disponibles",
+        description="Devuelve una lista de todos los cursos activos.",
         responses={200: CourseAvailableListSerializer(many=True)}
     )
     def get(self, request):
-        # Llamamos a la query nativa de db.py
-        courses = enrollment_db.get_available_courses()
-        # Pasamos el resultado por el Serializer (DTO)
+        # 1. Obtener la lista cruda
+        courses = get_available_courses()
+        
+        # 2. Paginar
+        paginator = StandardResultsSetPagination()
+        page = paginator.paginate_queryset(courses, request, view=self)
+        
+        if page is not None:
+            serializer = CourseAvailableListSerializer(page, many=True)
+            return paginator.get_paginated_response(serializer.data)
+            
         serializer = CourseAvailableListSerializer(courses, many=True)
-        return Response(serializer.data, status=status.HTTP_200_OK)
+        return Response(serializer.data)
+        
 
-
+#------------------Post/enrollmentStudent
 class EnrollStudentAPIView(APIView):
     """
-    Vista de la API para procesar la inscripcion de un alumno a un curso.
+    Vista de la API para procesar la inscripción de un alumno a un curso.
     """
     permission_classes = [permissions.IsAuthenticated]
 
     @extend_schema(
-        summary="Enroll in a course",
-        description="Inscribe al alumno autenticado en un curso activo. Valida el limite maximo de 3 cursos.",
+        summary="Inscripción a cursos disponibles",
+        description="El alumno autenticado puede anotarse a los cursos disponibles. Valida el límite máximo de 3 cursos en la versión MVP.",
         request=EnrollmentCreateSerializer,
         responses={
-            201: {"description": "Successfully enrolled"},
-            400: {"description": "Validation error (Course inactive, duplicate, or limit reached)"}
+            201: {"description": "Felicidades te has inscripto correctamente al curso"},
+            400: {"description": "Error al inscribirse)"}
         }
     )
     def post(self, request):
-        # Validamos el cuerpo de la peticion (body JSON)
+        # 1. Validación de ROL accediendo al perfil relacionado
+        try:
+            user_role = request.user.profile.role 
+        except AttributeError:
+            return Response(
+                {"detail": "Error: usuario sin perfil de alumno asignado."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        if user_role != 'STUDENT':
+            return Response(
+                {"detail": "Error: solo puedes anotarte si tu rol es estudiante."},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        # 2. Validación de Serializer
         serializer = EnrollmentCreateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         
-        # Tomamos el ID del alumno logueado directamente del token/request
+        # 3. Resto de tu lógica...
         student_id = request.user.id
         course_id = serializer.validated_data['course_id']
         
-        # Ejecutamos la transaccion en la base de datos
-        enrollment_id = enrollment_db.enroll_student_in_course(student_id, course_id)
+        enrollment_id = enroll_student_in_course(student_id, course_id)
         
         return Response(
             {
-                "message": "Successfully enrolled in the course.",
+                "message": "Felicidades te has inscripto correctamente al curso.",
                 "enrollment_id": enrollment_id
             },
             status=status.HTTP_201_CREATED
         )
 
 
-class StudentDashboardAPIView(APIView):
-    """
-    Vista de la API para ver el perfil del alumno y sus cursos enlazados con sus profesores.
-    """
-    permission_classes = [permissions.IsAuthenticated]
-
+#------------------GET/listEnrollment 
+class ListEnrollmentsAPIView(APIView):
+    permission_classes = [IsOwnerOrAdmin]
+    
     @extend_schema(
-        summary="Get student dashboard data",
-        description="Devuelve el perfil del alumno y la lista detallada de sus cursos inscritos con el nombre del profesor.",
-        responses={200: StudentDashboardSerializer}
+        summary="Lista de inscripciones",
+        description="Devuelve una lista de las inscripciones a cursos si es admin ve todo, si es profesor solo ve lo referente a sus cursos",
+        responses={200: CourseAvailableListSerializer(many=True)}
     )
     def get(self, request):
-        student_id = request.user.id
+        user = request.user
         
-        # Obtenemos el diccionario estructurado desde la base de datos
-        dashboard_data = enrollment_db.get_student_dashboard_data(student_id)
+        # 1. VALIDACIÓN EXPLÍCITA DE ROL
+        # Usamos tu función auxiliar get_user_role definida en tu archivo
+        role = get_user_role(user)
         
-        if not dashboard_data:
-            return Response({"detail": "Student profile not found."}, status=status.HTTP_404_NOT_FOUND)
-            
-        # Serializamos la respuesta final
-        serializer = StudentDashboardSerializer(dashboard_data)
+        # AGREGA ESTA LÍNEA Y MIRA LA TERMINAL DE DOCKER
+        print(f"DEBUG: El usuario {user.username} fue detectado con rol: {role}")
+        
+        if role not in ['ADMIN', 'PROFESSOR']:
+            return Response(
+                {"detail": "Si no es Admin o profesor, no puede visualizar este contenido."},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        # 2. LÓGICA DE NEGOCIO
+        all_enrollments = get_all_enrollments_db()
+        is_admin = user.is_staff or user.is_superuser
+        
+        if is_admin:
+            data_to_serialize = all_enrollments
+        else:
+            data_to_serialize = [
+                item for item in all_enrollments 
+                if item['professor_name'] == user.username
+            ]
+        
+        # 3. CONEXIÓN CON EL SERIALIZER
+        serializer = EnrollmentListSerializer(data_to_serialize, many=True)
+        
+        # 4. RESPUESTA
         return Response(serializer.data, status=status.HTTP_200_OK)
