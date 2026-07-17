@@ -1785,3 +1785,42 @@ input, textarea { font-family: var(--ff); }
 .dashboard--chat-full .dashboard-main {
   grid-column: 2 / -1;
 }
+@import url('./mobile-nav.css');
+@import url('./dark-mode.css');
+
+/* ── Del refactor de Profile: logros y salir (profile/LogrosCard, CerrarSesionCard) ── */
+.profile-logout-row { display: none; margin-top: 20px; }
+.profile-logros-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+.profile-logro-box { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 16px 10px; border-radius: 12px; background: var(--gris-claro); text-align: center; }
+.profile-logro-icon {
+  width: 40px; height: 40px; border-radius: 50%; background: var(--azul-sutil); display: flex;
+  align-items: center; justify-content: center; font-size: 18px; margin-bottom: 4px;
+}
+.profile-logro-nombre { font-size: 12.5px; color: var(--marino); }
+.profile-logro-fecha { font-size: 10.5px; color: var(--gris-medio); }
+@media (max-width: 900px) {
+  .profile-logros-grid { grid-template-columns: repeat(2, 1fr); }
+}
+
+/* ── Mobile: CTA fija + animación del bot en ChatPage ── */
+.mobile-fab-cta { display: none; }
+@media (max-width: 700px) {
+  .mobile-fab-cta {
+    display: flex; align-items: center; justify-content: center; gap: 6px;
+    position: fixed; left: 16px; right: 16px; bottom: calc(64px + 12px); z-index: 40;
+    background: var(--marino); color: white; padding: 14px 20px; border-radius: 50px;
+    font-size: 14px; font-weight: 700; border: none; box-shadow: var(--shadow-md);
+  }
+}
+.chatpage-bot-float { animation: float 1.5s ease-in-out infinite; }
+
+/* ── Onboarding: animación de la campana en PasoRecordatorios ── */
+.bell-shake { transform-origin: 401px 20px; animation: bell-ring 1.6s ease-in-out infinite; }
+@keyframes bell-ring {
+  0%, 100% { transform: rotate(0deg); }
+  10%      { transform: rotate(14deg); }
+  20%      { transform: rotate(-10deg); }
+  30%      { transform: rotate(8deg); }
+  40%      { transform: rotate(-4deg); }
+  50%      { transform: rotate(2deg); }
+}
