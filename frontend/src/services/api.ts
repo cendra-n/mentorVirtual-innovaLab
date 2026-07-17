@@ -57,10 +57,7 @@ export const apiRegister = (
 
 export const apiUpdateStudentProfile = (
   accessToken: string,
-  // Acepta cualquier campo de StudentProfile — hoy en español, más su
-  // versión en inglés (ver utils/studentProfileFields.ts) mientras dura
-  // la migración del backend.
-  data: Record<string, any>
+  data: { fecha_nacimiento?: string; genero?: string }
 ): Promise<ApiResult> =>
   fetch(`${BASE}/auth/profile/student/update/`, {
     method: 'PATCH',

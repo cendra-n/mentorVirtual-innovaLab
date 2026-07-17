@@ -90,7 +90,7 @@ export default function ChatPage() {
       <div className="chatpage-main">
         {messages.length === 0 ? (
           <div className="chatpage-empty">
-            <MentorBot mood="feliz" size={90} className="chatpage-bot-float" />
+            <MentorBot mood="feliz" size={90} />
             <p className="chatpage-empty-title">¿Qué vamos a estudiar hoy?</p>
           </div>
         ) : (

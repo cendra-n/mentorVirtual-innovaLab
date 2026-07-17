@@ -21,7 +21,6 @@ export default function App() {
     localStorage.setItem('refresh_token', refresh)
     setScreen('dashboard')
   }
-
   const handleRegisterSuccess = (access: string, refresh: string) => {
     localStorage.setItem('access_token', access)
     localStorage.setItem('refresh_token', refresh)
