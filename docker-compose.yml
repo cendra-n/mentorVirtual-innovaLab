@@ -52,7 +52,17 @@ services:
     ports:
       - "5173:5173"
     environment:
+      # No lo lee ningún código hoy (services/api.ts usa BASE='/api', ruta
+      # relativa que resuelve el proxy de abajo). La dejamos seteada por si
+      # en algún momento se necesita una URL absoluta desde el cliente
+      # (ej. build de producción servido en otro dominio que el backend).
       VITE_API_URL: http://localhost:8000
+      VITE_APP_NAME: ${VITE_APP_NAME:-Mentor Virtual}
+      VITE_MENTOR_NAME: ${VITE_MENTOR_NAME:-Pulso}
+      # Esta sí la usa vite.config.ts — es la URL con la que el PROCESO de Vite
+      # (corriendo dentro de este contenedor) le habla al backend por la red
+      # interna de Docker. Por eso el nombre del servicio, no localhost.
+      BACKEND_INTERNAL_URL: ${BACKEND_INTERNAL_URL:-http://backend:8000}
     networks:
       - mentor_net
 

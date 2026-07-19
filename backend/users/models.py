@@ -13,6 +13,61 @@ from django.db.models.signals import post_save
 from django.dispatch import receiver
 from django.contrib.postgres.fields import ArrayField
 
+# ── Analítica de eventos de usuario (Paula) ─────────────────
+class EventTypes:
+    LOGIN = 'login'
+    LOGOUT = 'logout'
+    VIDEO_PLAY = 'video_play'
+    CHALLENGE_COMPLETED = 'challenge_completed'
+
+# ── Entidades geográficas (Paula) ────────────────
+class Nationality(models.Model):
+    nationality_id = models.AutoField(primary_key=True)
+    nationality_name = models.CharField(max_length=100, unique=True)
+
+    def __str__(self):
+        return f"{self.nationality_name} ({self.nationality_id})"
+
+    class Meta:
+        verbose_name = "Nacionalidad"
+        verbose_name_plural = "Nacionalidades"
+
+class Country(models.Model):
+    country_id = models.AutoField(primary_key=True)
+    country_name = models.CharField(max_length=100, unique=True)
+
+    def __str__(self):
+        return f"{self.country_name} ({self.country_id})"
+
+    class Meta:
+        verbose_name = "País"
+        verbose_name_plural = "Países"
+
+class Province(models.Model):
+    province_id = models.AutoField(primary_key=True)
+    province_name = models.CharField(max_length=100, unique=True)
+    country = models.ForeignKey(Country, on_delete=models.CASCADE, related_name='provinces')
+
+    def __str__(self):
+        return f"{self.province_name} ({self.province_id}) - {self.country.country_name}"
+
+    class Meta:
+        verbose_name = "Provincia"
+        verbose_name_plural = "Provincias"
+
+class Locality(models.Model):
+    locality_id = models.AutoField(primary_key=True)
+    locality_name = models.CharField(max_length=100)
+    province = models.ForeignKey(Province, on_delete=models.CASCADE, related_name='localities')
+
+    def __str__(self):
+        return f"{self.locality_name} ({self.locality_id}) - {self.province.province_name}, {self.province.country.country_name}"
+
+    class Meta:
+        verbose_name = "Localidad"
+        verbose_name_plural = "Localidades"
+        unique_together = ('locality_name', 'province')
+
 
 class UserProfile(models.Model):
     user = models.OneToOneField(
@@ -37,6 +92,34 @@ class UserProfile(models.Model):
     phone = models.CharField(
         max_length=50, blank=True,
         help_text="Número telefónico de contacto."
+    )
+
+    nationality = models.ForeignKey(
+        Nationality, on_delete=models.SET_NULL, null=True, blank=True,
+        help_text="Nacionalidad del usuario."
+    )
+    country_residence = models.ForeignKey(
+        Country, on_delete=models.SET_NULL, null=True, blank=True,
+        help_text="País de residencia del usuario."
+    )
+    province_residence = models.ForeignKey(
+        Province, on_delete=models.SET_NULL, null=True, blank=True,
+        help_text="Provincia de residencia del usuario."
+    )
+    locality_residence = models.ForeignKey(
+        Locality, on_delete=models.SET_NULL, null=True, blank=True,
+        help_text="Localidad de residencia del usuario."
+    )
+    internet_access = models.BooleanField(
+        default=True,
+        help_text="Indica si el usuario tiene acceso a internet."
+    )
+    SESSION_STATUS_CHOICES = [
+        ('ONLINE', 'Online'),
+        ('OFFLINE', 'Offline'),
+    ]
+    session_status = models.CharField(
+        max_length=10, choices=SESSION_STATUS_CHOICES, default='OFFLINE'
     )
 
     def __str__(self):
@@ -153,8 +236,26 @@ class StudentProfile(models.Model):
     tiempo_api_youtube_minutos = models.FloatField(default=0)
     desafios_completados = models.PositiveIntegerField(default=0)
 
+    last_connection = models.DateTimeField(
+        null=True, blank=True,
+        help_text="Fecha y hora de la última conexión del usuario."
+    )
+
     def __str__(self):
         return f"Métricas de Estudiante: {self.user.username}"
+
+
+class UserActivityLog(models.Model):
+    """
+    Registro de actividad del usuario para análisis de comportamiento.
+    """
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='activity_logs')
+    event_type = models.CharField(max_length=50, help_text="Tipo de evento (ej. 'login', 'video_play', 'curso_completado').")
+    timestamp = models.DateTimeField(auto_now_add=True)
+    metadata = models.JSONField(default=dict, blank=True)
+
+    def __str__(self):
+        return f"Actividad de {self.user.username} a las {self.timestamp}"
 
 # ── Señales — se crean automáticamente al registrar un usuario ────────────────
 

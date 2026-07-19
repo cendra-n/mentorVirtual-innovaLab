@@ -43,10 +43,12 @@ INSTALLED_APPS = [
     'goals',
     'courses',
     'progress',
+    'enrollment',
 ]
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+    'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
@@ -147,6 +149,16 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/6.0/howto/static-files/
 
 STATIC_URL = 'static/'
+STATIC_ROOT = BASE_DIR / 'staticfiles'
+
+STORAGES = {
+    "default": {
+        "BACKEND": "django.core.files.storage.FileSystemStorage",
+    },
+    "staticfiles": {
+        "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage",
+    },
+}
 
 # Configuración de Django REST Framework
 # Se definen las clases de autenticación y el esquema de generación de OpenAPI por defecto
@@ -224,7 +236,12 @@ MAX_COURSES_PER_PROFESSOR = int(os.environ.get("MAX_COURSES_PER_PROFESSOR", 2))
 AI_PROVIDER = os.environ.get('AI_PROVIDER', '')
 
 ANTHROPIC_API_KEY = os.environ.get('ANTHROPIC_API_KEY', '')
-ANTHROPIC_MODEL   = os.environ.get('ANTHROPIC_MODEL', 'claude-sonnet-4-6')
+ANTHROPIC_MODEL   = os.environ.get('ANTHROPIC_MODEL', 'claude-sonnet-5')
+
+# API pública de GeoRef (datos.gob.ar) — fuente de países/provincias/localidades
+# para el comando load_georef. Configurable por si cambia de versión/dominio,
+# o para apuntar a un mock en tests.
+GEOREF_API_BASE_URL = os.environ.get('GEOREF_API_BASE_URL', 'https://apis.datos.gob.ar/georef/api')
 
 OPENAI_API_KEY = os.environ.get('OPENAI_API_KEY', '')
 OPENAI_MODEL   = os.environ.get('OPENAI_MODEL', 'gpt-4o-mini')

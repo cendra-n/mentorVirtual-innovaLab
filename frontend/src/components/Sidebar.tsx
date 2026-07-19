@@ -1,9 +1,10 @@
+import { useState, useEffect } from 'react'
 import MentorBot from './MentorBot'
 
 interface Props {
   active: string
   onNav: (page: string) => void
-  user: { username: string; first_name?: string; is_staff?: boolean } | null
+  user: { username: string; first_name?: string; is_staff?: boolean; avatar_url?: string } | null
   streak: number
   onLogout: () => void
   onAdmin?: () => void
@@ -25,6 +26,9 @@ const NAV = [
 export default function Sidebar({ active, onNav, user, streak, onLogout, onAdmin }: Props) {
   const appName = import.meta.env.VITE_APP_NAME || 'Impulsa'
   const displayName = user?.first_name || user?.username || 'Usuario'
+  const [avatarError, setAvatarError] = useState(false)
+
+  useEffect(() => { setAvatarError(false) }, [user?.avatar_url])
 
   return (
     <aside className="sidebar">
@@ -54,7 +58,16 @@ export default function Sidebar({ active, onNav, user, streak, onLogout, onAdmin
       <div className="sidebar-bottom">
         <div className="user-card">
           <div className="user-avatar">
-            {displayName.charAt(0).toUpperCase()}
+            {user?.avatar_url && !avatarError ? (
+              <img
+                src={user.avatar_url}
+                alt={displayName}
+                className="user-avatar-img"
+                onError={() => setAvatarError(true)}
+              />
+            ) : (
+              displayName.charAt(0).toUpperCase()
+            )}
           </div>
           <div className="user-info">
             <span className="user-name">{displayName}</span>

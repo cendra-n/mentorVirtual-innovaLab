@@ -10,8 +10,9 @@ Combina:
 - Paginación en listado de usuarios
 """
 import logging # <-- IMPORTANTE: Módulo para registrar los errores en el servidor
-from .serializers import StudentProfileSerializer
-from .models import StudentProfile
+from .serializers import StudentProfileSerializer, CountrySerializer, ProvinceSerializer, LocalitySerializer
+from .models import StudentProfile, EventTypes, UserActivityLog
+from django.utils.timezone import now
 from django.contrib.auth import authenticate
 from django.contrib.auth.models import User
 from django.contrib.auth.hashers import make_password
@@ -99,6 +100,17 @@ def api_login(request):
     profile = getattr(user, 'profile', None)
     config  = getattr(user, 'config', None)
 
+    # Guardamos la última conexión y marcamos la sesión como ONLINE (Paula)
+    if profile:
+        profile.session_status = 'ONLINE'
+        profile.save(update_fields=['session_status'])
+
+    student = getattr(user, 'student_analytics', None)
+    UserActivityLog.objects.create(user=user, event_type=EventTypes.LOGIN)
+    if student:
+        student.last_connection = now()
+        student.save(update_fields=['last_connection'])
+
     return Response({
         'message': 'Login exitoso',
         **tokens,
@@ -160,6 +172,9 @@ def api_register(request):
         profile = user.profile
         profile.phone      = data.get('phone', '')
         profile.avatar_url = data.get('avatar_url', '')
+        if data.get('country'):  profile.country_residence  = data['country']
+        if data.get('province'): profile.province_residence = data['province']
+        if data.get('locality'): profile.locality_residence = data['locality']
         profile.save()
 
         # Config — creada por señal, solo actualizamos
@@ -181,6 +196,9 @@ def api_register(request):
                 'role':       profile.role       if profile else 'STUDENT',
                 'phone':      profile.phone,
                 'avatar_url': profile.avatar_url,
+                'country_residence':  CountrySerializer(profile.country_residence).data if profile.country_residence else None,
+                'province_residence': ProvinceSerializer(profile.province_residence).data if profile.province_residence else None,
+                'locality_residence': LocalitySerializer(profile.locality_residence).data if profile.locality_residence else None,
                 'config': {
                     'font_size':      config.font_size,
                     'high_contrast':  config.high_contrast,
@@ -218,6 +236,14 @@ def api_logout(request):
         token.blacklist()
     except Exception:
         pass
+
+    # Cambio de status de sesión a OFFLINE (Paula)
+    profile = getattr(request.user, 'profile', None)
+    if profile:
+        profile.session_status = 'OFFLINE'
+        profile.save(update_fields=['session_status'])
+    UserActivityLog.objects.create(user=request.user, event_type=EventTypes.LOGOUT)
+
     return Response({'message': 'Sesión cerrada correctamente.'}, status=status.HTTP_200_OK)
 
 
@@ -248,6 +274,7 @@ def api_profile(request):
     config  = getattr(user, 'config', None)
 
     if request.method == 'GET':
+        student_profile = StudentProfile.objects.filter(user=user).first()
         return Response({
             'id':         user.id,
             'username':   user.username,
@@ -257,6 +284,10 @@ def api_profile(request):
             'date_joined': user.date_joined,
             'phone':      profile.phone      if profile else '',
             'avatar_url': profile.avatar_url if profile else '',
+            'fecha_nacimiento': student_profile.fecha_nacimiento if student_profile else None,
+            'country_residence':  CountrySerializer(profile.country_residence).data if profile and profile.country_residence else None,
+            'province_residence': ProvinceSerializer(profile.province_residence).data if profile and profile.province_residence else None,
+            'locality_residence': LocalitySerializer(profile.locality_residence).data if profile and profile.locality_residence else None,
             'config': {
                 'font_size':      config.font_size      if config else 'MEDIUM',
                 'high_contrast':  config.high_contrast  if config else False,
@@ -282,6 +313,9 @@ def api_profile(request):
     if profile:
         if 'phone'      in data: profile.phone      = data['phone']
         if 'avatar_url' in data: profile.avatar_url = data['avatar_url']
+        if 'country'    in data: profile.country_residence  = data['country']
+        if 'province'   in data: profile.province_residence = data['province']
+        if 'locality'   in data: profile.locality_residence = data['locality']
         profile.save()
 
     # Config
@@ -299,6 +333,9 @@ def api_profile(request):
             'email':      user.email,
             'phone':      profile.phone      if profile else '',
             'avatar_url': profile.avatar_url if profile else '',
+            'country_residence':  CountrySerializer(profile.country_residence).data if profile and profile.country_residence else None,
+            'province_residence': ProvinceSerializer(profile.province_residence).data if profile and profile.province_residence else None,
+            'locality_residence': LocalitySerializer(profile.locality_residence).data if profile and profile.locality_residence else None,
             'config': {
                 'font_size':      config.font_size      if config else 'MEDIUM',
                 'high_contrast':  config.high_contrast  if config else False,
@@ -406,16 +443,23 @@ def api_users_list(request):
 # Vista de StudentProfile
 
 @extend_schema(
+    methods=['GET'],
+    summary="Obtener perfil de estudiante",
+    description="Devuelve los datos del perfil demográfico y de intereses del estudiante autenticado (incluye fecha_nacimiento).",
+    responses={200: StudentProfileSerializer}
+)
+@extend_schema(
+    methods=['PATCH'],
     summary="Actualizar perfil de estudiante",
     description="Actualización parcial de los datos de perfil demográfico y de intereses para analítica.",
     request=StudentProfileSerializer,
     responses={200: StudentProfileSerializer}
 )
-@api_view(['PATCH'])
+@api_view(['GET', 'PATCH'])
 @permission_classes([IsAuthenticated])
 def api_update_student_profile(request):
     """
-    Vista para actualizar los campos del perfil analítico del estudiante.
+    Vista para leer/actualizar los campos del perfil analítico del estudiante.
     """
     try:
         profile, created = StudentProfile.objects.get_or_create(user=request.user)
@@ -423,6 +467,10 @@ def api_update_student_profile(request):
         # Registramos el error real en el servidor para debuggear, manteniendo la respuesta segura
         logger.error(f"Fallo al acceder/crear StudentProfile: {str(e)}", exc_info=True)
         return Response({"detail": "Error al acceder al perfil."}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+    if request.method == 'GET':
+        serializer = StudentProfileSerializer(profile)
+        return Response(serializer.data, status=status.HTTP_200_OK)
 
     serializer = StudentProfileSerializer(profile, data=request.data, partial=True)
     if serializer.is_valid():

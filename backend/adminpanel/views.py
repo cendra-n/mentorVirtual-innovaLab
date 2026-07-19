@@ -8,6 +8,7 @@ from rest_framework.permissions import IsAdminUser
 from rest_framework import status
 from users.models import UserProfile, ProfessorProfile
 from users.serializers import AdminCreateProfessorSerializer
+from users.pagination import CustomPagination
 
 # Configuración del logger estándar para esta vista
 logger = logging.getLogger(__name__) 
@@ -17,8 +18,12 @@ class AdminUserListView(APIView):
 
     def get(self, request):
         users = User.objects.all().order_by('-date_joined')
+
+        paginator = CustomPagination()
+        page = paginator.paginate_queryset(users, request, view=self)
+
         data = []
-        for u in users:
+        for u in page:
             role = 'STUDENT'
             if hasattr(u, 'profile'):
                 role = u.profile.role
@@ -29,9 +34,10 @@ class AdminUserListView(APIView):
                 'is_active': u.is_active,
                 'is_staff': u.is_staff,
                 'date_joined': u.date_joined,
-                'role': role
+                'role': role,
+                'avatar_url': u.profile.avatar_url if hasattr(u, 'profile') else ''
             })
-        return Response({'users': data})
+        return paginator.get_paginated_response(data)
 
 
 class AdminUserDetailView(APIView):

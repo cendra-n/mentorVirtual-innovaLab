@@ -12,7 +12,7 @@ const h = () => ({
 })
 
 // ── API calls ────────────────────────────────────────────────────────────────
-const apiUsers     = () => fetch(`${BASE}/admin/users/`,          { headers: h() }).then(r => r.json())
+const apiUsers     = (page: number = 1) => fetch(`${BASE}/admin/users/?page=${page}`, { headers: h() }).then(r => r.json())
 const apiUserDetail= (id: number) => fetch(`${BASE}/admin/users/${id}/`, { headers: h() }).then(r => r.json())
 const apiSetPass   = (id: number, password: string) =>
   fetch(`${BASE}/admin/users/${id}/set_password/`, {
@@ -27,17 +27,31 @@ const apiStats     = () => fetch(`${BASE}/admin/stats/`,          { headers: h()
 export default function AdminPanel({ onBack }: Props) {
   const [tab, setTab]         = useState<'usuarios' | 'stats'>('usuarios')
   const [users, setUsers]     = useState<any[]>([])
+  const [userCount, setUserCount] = useState(0)
+  const [page, setPage]       = useState(1)
+  const [totalPages, setTotalPages] = useState(1)
   const [stats, setStats]     = useState<any>(null)
   const [selected, setSelected] = useState<any>(null)
   const [newPass, setNewPass] = useState('')
   const [confirm, setConfirm] = useState('')
   const [msg, setMsg]         = useState('')
   const [loading, setLoading] = useState(false)
+  const [detailAvatarError, setDetailAvatarError] = useState(false)
+
+  useEffect(() => { setDetailAvatarError(false) }, [selected?.id])
+
+  const loadUsers = (p: number = page) => {
+    apiUsers(p).then(d => {
+      setUsers(d.results || d.users || [])
+      setUserCount(d.count ?? (d.users || []).length)
+      setTotalPages(d.total_pages || 1)
+    })
+  }
 
   useEffect(() => {
-    if (tab === 'usuarios') apiUsers().then(d => setUsers(d.users || []))
+    if (tab === 'usuarios') loadUsers(page)
     if (tab === 'stats')    apiStats().then(setStats)
-  }, [tab])
+  }, [tab, page])
 
   const handleSetPass = async () => {
     if (newPass !== confirm) { setMsg('❌ Las contraseñas no coinciden.'); return }
@@ -52,7 +66,7 @@ export default function AdminPanel({ onBack }: Props) {
 
   const handleToggle = async (user: any) => {
     await apiToggleActive(user.id, !user.is_active)
-    apiUsers().then(d => setUsers(d.users || []))
+    loadUsers(page)
   }
 
   return (
@@ -78,7 +92,7 @@ export default function AdminPanel({ onBack }: Props) {
         {tab === 'usuarios' && (
           <div className="admin-users">
             <div className="users-list">
-              <h2 className="admin-section-title">Usuarios ({users.length})</h2>
+              <h2 className="admin-section-title">Usuarios</h2>
               <table className="admin-table">
                 <thead>
                   <tr>
@@ -109,13 +123,48 @@ export default function AdminPanel({ onBack }: Props) {
                   ))}
                 </tbody>
               </table>
+
+              <div className="users-pagination">
+                {totalPages > 1 ? (
+                  <>
+                    <button
+                      className="pagination-btn"
+                      disabled={page <= 1}
+                      onClick={() => setPage(p => Math.max(1, p - 1))}
+                    >
+                      ← Anterior
+                    </button>
+                    <span className="pagination-info">{userCount} usuarios · Página {page} de {totalPages}</span>
+                    <button
+                      className="pagination-btn"
+                      disabled={page >= totalPages}
+                      onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                    >
+                      Siguiente →
+                    </button>
+                  </>
+                ) : (
+                  <span className="pagination-info">{userCount} usuarios</span>
+                )}
+              </div>
             </div>
 
             {/* Panel de usuario seleccionado */}
             {selected && (
               <div className="user-detail-panel">
                 <div className="user-detail-header">
-                  <div className="user-detail-avatar">{selected.username.charAt(0).toUpperCase()}</div>
+                  <div className="user-detail-avatar">
+                    {selected.avatar_url && !detailAvatarError ? (
+                      <img
+                        src={selected.avatar_url}
+                        alt={selected.username}
+                        className="user-detail-avatar-img"
+                        onError={() => setDetailAvatarError(true)}
+                      />
+                    ) : (
+                      selected.username.charAt(0).toUpperCase()
+                    )}
+                  </div>
                   <div>
                     <h3>{selected.username}</h3>
                     <p>{selected.email || 'Sin email'}</p>

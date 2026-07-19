@@ -47,13 +47,44 @@ export const apiRegister = (
   username: string,
   email: string,
   password: string,
-  passwordConfirm: string
+  passwordConfirm: string,
+  geo?: { country?: number | null; province?: number | null; locality?: number | null }
 ): Promise<ApiResult> =>
   fetch(`${BASE}/auth/register/`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ username, email, password, password_confirm: passwordConfirm }),
+    body: JSON.stringify({
+      username, email, password, password_confirm: passwordConfirm,
+      ...(geo?.country  ? { country: geo.country }   : {}),
+      ...(geo?.province ? { province: geo.province } : {}),
+      ...(geo?.locality ? { locality: geo.locality } : {}),
+    }),
   }).then(async r => ({ ok: r.ok, status: r.status, data: await r.json() }))
+
+// PATCH /me/ — email, teléfono, avatar y país/provincia/localidad de residencia
+export const apiUpdateProfile = (data: Record<string, any>): Promise<ApiResult> =>
+  fetch(`${BASE}/auth/me/`, {
+    method: 'PATCH',
+    headers: headers(),
+    body: JSON.stringify(data),
+  }).then(async r => ({ ok: r.ok, status: r.status, data: await r.json() }))
+
+// ── Geo (países / provincias) ──────────────────────────────────────────────────
+export const apiGeoCountries = (): Promise<ApiResult> =>
+  fetch(`${BASE}/auth/geo/countries/`, { headers: headers() })
+    .then(async r => ({ ok: r.ok, status: r.status, data: await r.json() }))
+
+export const apiGeoProvinces = (countryId: number | string): Promise<ApiResult> =>
+  fetch(`${BASE}/auth/geo/provinces/list?country=${countryId}`, { headers: headers() })
+    .then(async r => ({ ok: r.ok, status: r.status, data: await r.json() }))
+
+// Ojo: 'province' es obligatorio en el backend — pedirlo sin filtro devuelve 400
+// (antes bloqueaba Swagger devolviendo las ~3.800 localidades de golpe, sin paginar).
+// 'search' filtra por texto server-side — es lo que arma el autocompletado
+// (con page_size chico ahora, no tiene sentido traer todo de una).
+export const apiGeoLocalities = (provinceId: number | string, search?: string): Promise<ApiResult> =>
+  fetch(`${BASE}/auth/geo/localities/?province=${provinceId}${search ? `&search=${encodeURIComponent(search)}` : ''}`, { headers: headers() })
+    .then(async r => ({ ok: r.ok, status: r.status, data: await r.json() }))
 
 export const apiUpdateStudentProfile = (
   accessToken: string,
@@ -93,6 +124,71 @@ export const apiDeleteGoal = (id: number) =>
     method: 'DELETE',
     headers: headers(),
   }).then(r => r.json())
+
+// ── authFetch: intercepta 401, refresca el token una vez y reintenta ──────────
+// Si el refresh también falla, fuerza logout (limpia tokens y recarga para
+// que App.tsx vuelva a la pantalla de login).
+let refreshing: Promise<boolean> | null = null
+
+async function doRefresh(): Promise<boolean> {
+  const refresh = localStorage.getItem('refresh_token')
+  if (!refresh) return false
+  try {
+    const r = await fetch(`${BASE}/auth/token/refresh/`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ refresh }),
+    })
+    if (!r.ok) return false
+    const data = await r.json()
+    if (!data.access) return false
+    localStorage.setItem('access_token', data.access)
+    // ROTATE_REFRESH_TOKENS=True en el backend: si vuelve un refresh nuevo, lo guardamos.
+    if (data.refresh) localStorage.setItem('refresh_token', data.refresh)
+    return true
+  } catch {
+    return false
+  }
+}
+
+function forceLogout() {
+  localStorage.removeItem('access_token')
+  localStorage.removeItem('refresh_token')
+  localStorage.removeItem('chat_recientes')
+  window.location.reload()
+}
+
+export async function authFetch(input: string, init: RequestInit = {}): Promise<Response> {
+  const doFetch = () =>
+    fetch(input, {
+      ...init,
+      headers: { ...headers(), ...(init.headers || {}) },
+    })
+
+  let res = await doFetch()
+
+  if (res.status === 401) {
+    if (!refreshing) refreshing = doRefresh().finally(() => { refreshing = null })
+    const ok = await refreshing
+    if (!ok) {
+      forceLogout()
+      return res
+    }
+    res = await doFetch()
+    if (res.status === 401) {
+      forceLogout()
+    }
+  }
+
+  return res
+}
+
+// ── Tutor / Chat con Pulso ─────────────────────────────────────────────────
+export const apiChatPulso = (question: string): Promise<ApiResult> =>
+  authFetch(`${BASE}/tutor/chat/`, {
+    method: 'POST',
+    body: JSON.stringify({ question }),
+  }).then(async r => ({ ok: r.ok, status: r.status, data: await r.json() }))
 
 // ── Progress ──────────────────────────────────────────────────────────────────
 export const apiCompleteStep = (stepId: number, goalId: number) =>

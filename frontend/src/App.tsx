@@ -17,11 +17,13 @@ export default function App() {
   const [onboardingToken, setOnboardingToken] = useState<string | null>(null)
 
   const handleLogin = (access: string, refresh: string) => {
+    localStorage.removeItem('chat_recientes')
     localStorage.setItem('access_token', access)
     localStorage.setItem('refresh_token', refresh)
     setScreen('dashboard')
   }
   const handleRegisterSuccess = (access: string, refresh: string) => {
+    localStorage.removeItem('chat_recientes')
     localStorage.setItem('access_token', access)
     localStorage.setItem('refresh_token', refresh)
     localStorage.setItem('onboarding_pending', 'true')
@@ -38,6 +40,7 @@ export default function App() {
   const handleLogout = () => {
     localStorage.removeItem('access_token')
     localStorage.removeItem('refresh_token')
+    localStorage.removeItem('chat_recientes')
     setOnboardingToken(null)
     setScreen('login')
   }

@@ -43,12 +43,19 @@ CREATE TABLE IF NOT EXISTS videos (
 CREATE TABLE IF NOT EXISTS logros (
     id           SERIAL PRIMARY KEY,
     goal_id      INTEGER NOT NULL REFERENCES goals(id) ON DELETE CASCADE,
-    name         VARCHAR(100) NOT NULL,
+    name         VARCHAR(150) NOT NULL,
     description  TEXT,
-    icon         VARCHAR(10)  NOT NULL DEFAULT '🏆',
+    icon         VARCHAR(20)  NOT NULL DEFAULT '🏆',
     unlocked     BOOLEAN      NOT NULL DEFAULT FALSE,
     unlocked_at  TIMESTAMPTZ
 );
+
+-- CREATE TABLE IF NOT EXISTS no evoluciona columnas de una tabla ya existente,
+-- así que estos ALTER quedan sueltos acá para que correr este archivo de nuevo
+-- sobre una base vieja siempre deje el ancho correcto (ensanchar es idempotente
+-- y no pierde datos, aunque ya esté en VARCHAR(150)/VARCHAR(20)).
+ALTER TABLE logros ALTER COLUMN name TYPE VARCHAR(150);
+ALTER TABLE logros ALTER COLUMN icon TYPE VARCHAR(20);
 
 CREATE TABLE IF NOT EXISTS user_progress (
     id           SERIAL PRIMARY KEY,
@@ -165,9 +172,10 @@ END;
 $$ LANGUAGE plpgsql;
 
 -- ── FIX: usar alias g para evitar ambigüedad del id ──────────────────────────
+DROP FUNCTION IF EXISTS sp_get_steps_by_goal(INTEGER, INTEGER);
 CREATE OR REPLACE FUNCTION sp_get_steps_by_goal(p_goal_id INT, p_user_id INT)
 RETURNS TABLE(
-    id INT, goal_id INT, "order" SMALLINT, title VARCHAR,
+    id INT, goal_id INT, "order" INTEGER, title VARCHAR,
     description TEXT, completed BOOLEAN, completed_at TIMESTAMPTZ
 ) AS $$
 BEGIN
