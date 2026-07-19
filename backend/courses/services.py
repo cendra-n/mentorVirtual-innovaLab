@@ -3,6 +3,7 @@ import logging
 import urllib.request
 import urllib.parse
 from django.conf import settings
+from core.ai_providers import get_ai_provider
 
 logger = logging.getLogger(__name__)
 
@@ -98,38 +99,16 @@ class AnthropicService:
             quiz_instruction=quiz_instruction
         )
 
-        payload = json.dumps({
-            "model": "claude-sonnet-4-6",
-            "max_tokens": 4000,
-            "system": "Eres un tutor empático y estructurado que responde estrictamente en formato JSON válido.",
-            "messages": [
-                {"role": "user", "content": prompt}
-            ],
-        }).encode("utf-8")
-
-        req = urllib.request.Request(
-            "https://api.anthropic.com/v1/messages",
-            data=payload,
-            headers={
-                "Content-Type": "application/json",
-                "x-api-key": settings.ANTHROPIC_API_KEY,
-                "anthropic-version": "2023-06-01",
-            },
-            method="POST",
-        )
-
         try:
-            with urllib.request.urlopen(req, timeout=90) as resp:
-                response_data = json.loads(resp.read().decode("utf-8"))
-            
-            # Buscar el bloque de texto en la lista de bloques
-            raw_text = ""
-            for block in response_data.get("content", []):
-                if block.get("type") == "text":
-                    raw_text = block.get("text", "").strip()
-                    break
+            ai = get_ai_provider()
+            raw_text = ai.complete(
+                system="Eres un tutor empático y estructurado que responde estrictamente en formato JSON válido.",
+                prompt=prompt,
+                max_tokens=4000,
+            )
 
-            # Limpieza de markdown en caso de que Claude responda con bloques de código
+            # Limpieza de markdown en caso de que el modelo responda con bloques de código
+            raw_text = raw_text.strip()
             if raw_text.startswith("```"):
                 raw_text = raw_text.split("```")[1]
                 if raw_text.startswith("json"):
@@ -138,7 +117,7 @@ class AnthropicService:
 
             return json.loads(raw_text)
         except Exception as e:
-            logger.error("Error al comunicarse con Anthropic: %s", e)
+            logger.error("Error al comunicarse con el proveedor de IA: %s", e)
             raise ValueError(f"No se pudo generar la estructura del curso debido a un error en el servicio de IA: {str(e)}")
 
 

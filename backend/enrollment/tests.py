@@ -75,3 +75,60 @@ class MyEnrollmentsAPITest(APITestCase):
         """Verifica que un usuario no logueado reciba un 401."""
         response = self.client.get(self.url)
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+
+class EnrollStudentAPITest(APITestCase):
+    """
+    Regresión: un alumno que ya está inscripto en un curso y vuelve a mandar
+    POST /enrollment/enroll/ para el mismo curso NO debe pisar/renovar su
+    inscripción existente — debe rechazarse con 400 y el mensaje
+    'Ya estas anotado en este curso.', y no debe crearse una segunda fila.
+    """
+
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        # sp_enroll_student ya se crea vía la migración enrollment/0002, pero
+        # reforzamos acá por si el entorno de test corre con --keepdb viejo.
+        with connection.cursor() as cursor:
+            cursor.execute("SELECT 1 FROM pg_proc WHERE proname = 'sp_enroll_student'")
+            if not cursor.fetchone():
+                raise AssertionError(
+                    "sp_enroll_student no existe en la DB de test — "
+                    "falta correr las migraciones de enrollment (0002_load_stored_procedures)."
+                )
+
+    def setUp(self):
+        from courses.models import Course
+
+        self.student = User.objects.create_user(username='alumno', email='alumno@test.com', password='password')
+        self.profile = UserProfile.objects.get(user=self.student)
+        self.profile.role = 'STUDENT'
+        self.profile.save()
+
+        self.professor = User.objects.create_user(username='profe', email='profe@test.com', password='password')
+
+        self.course = Course.objects.create(
+            professor=self.professor,
+            title='Curso de prueba',
+            is_active=True,
+        )
+        self.url = reverse('enrollment:enroll-student')
+
+    def test_reenroll_same_course_is_rejected_not_overwritten(self):
+        self.client.force_authenticate(user=self.student)
+
+        first = self.client.post(self.url, {'course_id': self.course.id}, format='json')
+        self.assertEqual(first.status_code, status.HTTP_201_CREATED)
+
+        second = self.client.post(self.url, {'course_id': self.course.id}, format='json')
+        self.assertEqual(second.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('Ya estas anotado en este curso.', str(second.data))
+
+        with connection.cursor() as cursor:
+            cursor.execute(
+                "SELECT COUNT(*) FROM enrollment_enrollment WHERE student_id = %s AND course_id = %s",
+                [self.student.id, self.course.id],
+            )
+            count = cursor.fetchone()[0]
+        self.assertEqual(count, 1, "La reinscripción no debe crear/pisar una segunda fila.")

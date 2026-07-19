@@ -15,9 +15,7 @@ def _rows_as_dicts(cursor):
 def get_available_courses() -> list[dict]:
     with connection.cursor() as cur:
         cur.execute("SELECT * FROM sp_get_available_courses()")
-        data = _rows_as_dicts(cur)
-        print("DEBUG: Datos recibidos desde DB:", data) # <-- Esto aparecerá en los logs del contenedor
-        return data
+        return _rows_as_dicts(cur)
 
 #Endpoint para que el alumno se anota a un curso activo con validación de 3 incluida desde el sp.   
 def enroll_student_in_course(student_id: int, course_id: int) -> int:

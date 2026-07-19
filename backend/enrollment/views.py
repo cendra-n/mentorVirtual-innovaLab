@@ -130,14 +130,10 @@ class ListEnrollmentsAPIView(APIView):
     )
     def get(self, request):
         user = request.user
-       
-       # 1. VALIDACIÓN EXPLÍCITA DE ROL
-        role = get_user_role(user)
-        
-        # AGREGA ESTA LÍNEA Y MIRA LA TERMINAL DE DOCKER
-        print("DEBUG: Entrando a la vista, rol detectado:", get_user_role(request.user))
 
-       
+        # 1. VALIDACIÓN EXPLÍCITA DE ROL
+        role = get_user_role(user)
+
         if role not in ['ADMIN', 'PROFESSOR']:
             return Response(
                 {"detail": "Si no es Admin o profesor, no puede visualizar este contenido."},
