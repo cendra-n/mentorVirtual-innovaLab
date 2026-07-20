@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react'
 import { apiRegister, apiUpdateStudentProfile, parseFieldErrors, apiGeoCountries, apiGeoProvinces } from '../services/api'
 import { getPasswordChecks, calcularEdad } from '../utils/authValidation'
-import { withEnglishFallback } from '../utils/studentProfileFields'
 
 export type Genero = 'F' | 'M' | 'ND'
 export type RegisterField = 'email' | 'username' | 'password' | 'confirm' | 'fechaNacimiento' | 'genero' | 'terminos'
@@ -158,10 +157,10 @@ export function useRegisterForm(onRegisterSuccess: (access: string, refresh: str
       })
       if (res.ok && res.data.access) {
         try {
-          await apiUpdateStudentProfile(res.data.access, withEnglishFallback({
-            fecha_nacimiento: fechaNacimiento,
-            genero,
-          }))
+          await apiUpdateStudentProfile(res.data.access, {
+            birth_date: fechaNacimiento,
+            user_gender: genero,
+          })
         } catch {
           // Si falla este segundo paso, no bloqueamos el acceso: la cuenta
           // ya se creó bien. La persona puede completar fecha/género después

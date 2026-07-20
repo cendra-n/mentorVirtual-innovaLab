@@ -76,7 +76,7 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
     volumes:
       - pg_data:/var/lib/postgresql/data
-#      - ./backend/init.sql:/docker-entrypoint-initdb.d/01_init.sql
+      - ./backend/init.sql:/docker-entrypoint-initdb.d/01_init.sql
     ports:
       - "5432:5432"
     networks:

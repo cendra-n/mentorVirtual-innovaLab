@@ -7,11 +7,17 @@ StudentProfile — métricas, progreso y comportamiento para análisis de datos.
 
 Ambos se crean automáticamente via señales al crear un User.
 """
+import threading
+import logging
 from django.db import models
+from django.conf import settings
 from django.contrib.auth.models import User
+from django.core.mail import send_mail
 from django.db.models.signals import post_save
 from django.dispatch import receiver
 from django.contrib.postgres.fields import ArrayField
+
+logger = logging.getLogger('users')
 
 # ── Analítica de eventos de usuario (Paula) ─────────────────
 class EventTypes:
@@ -169,9 +175,9 @@ class StudentProfile(models.Model):
 
     # --- DATOS DE IDENTIDAD ---
     
-    fecha_nacimiento = models.DateField(null=True, blank=True)
+    birth_date = models.DateField(null=True, blank=True)
     
-    NIVEL_EDUCATIVO_CHOICES = [
+    EDUCATION_LEVEL_CHOICES = [
         ('primario_completo', 'Primario Completo'),
         ('primario_incompeto', 'Primario Incompleto'),
         ('secundario_incompleto', 'Secundario Incompleto'),
@@ -183,58 +189,58 @@ class StudentProfile(models.Model):
         ('universitario_en_curso', 'Universitario en Curso'),
         ('universitario_incompleto', 'Universtario Incompleto')
     ]
-    nivel_educativo = models.CharField(max_length=50, choices=NIVEL_EDUCATIVO_CHOICES, blank=True)
+    education_level = models.CharField(max_length=50, choices=EDUCATION_LEVEL_CHOICES, blank=True)
     
-    ESTADO_LABORAL_CHOICES = [
+    EMPLOYMENT_STATUS_CHOICES = [
         ('activo', 'Activo'),
         ('desempleado', 'Desempleado'),
     ]
-    estado_laboral = models.CharField(max_length=20, choices=ESTADO_LABORAL_CHOICES, blank=True)
+    employment_status = models.CharField(max_length=20, choices=EMPLOYMENT_STATUS_CHOICES, blank=True)
         
-    GENERO_CHOICES = [
+    GENDER_CHOICES = [
         ('M', 'Masculino'),
         ('F', 'Femenino'), 
         #poner "otro"
         ('ND', 'Prefiero no decirlo'),
     ]
-    genero = models.CharField(max_length=2, choices=GENERO_CHOICES, blank=True)
+    user_gender = models.CharField(max_length=2, choices=GENDER_CHOICES, blank=True)
 
-    OBJETIVO_CHOICES = [
+    PRIMARY_OBJECTIVE_CHOICES = [
         ('empleo', 'Mejorar oportunidades laborales'),
         ('personal', 'Desarrollo personal'),
         ('estudios', 'Apoyo para educación formal'),
         ('hobby', 'Curiosidad o pasatiempo'),
     ]
-    objetivo_principal = models.CharField(max_length=20, choices=OBJETIVO_CHOICES, blank=True)
+    primary_objective = models.CharField(max_length=20, choices=PRIMARY_OBJECTIVE_CHOICES, blank=True)
 
-    DISPONIBILIDAD_CHOICES = [
+    TIME_AVAILABILITY_CHOICES = [
         ('baja', 'Menos de 2 horas semanales'),
         ('media', 'Entre 2 y 5 horas semanales'),
         ('alta', 'Más de 5 horas semanales'),
     ]
-    disponibilidad_tiempo = models.CharField(max_length=10, choices=DISPONIBILIDAD_CHOICES, blank=True)
+    time_availability = models.CharField(max_length=10, choices=TIME_AVAILABILITY_CHOICES, blank=True)
     
-    zona_horaria = models.CharField(
+    time_zone = models.CharField(
         max_length=50, 
         default='America/Argentina/Buenos_Aires',
         help_text="Zona horaria del usuario para sincronización de notificaciones y eventos."
     )
     
-    intereses = models.JSONField(default=list, blank=True)
+    user_interests = models.JSONField(default=list, blank=True)
 
     # --- DATOS DE COMPORTAMIENTO ---
     
-    frecuencia_entradas = models.PositiveIntegerField(default=0)
-    racha_actual_dias = models.PositiveIntegerField(default=0)
-    racha_maxima_dias = models.PositiveIntegerField(default=0)
-    tiempo_acumulado_app_minutos = models.FloatField(default=0)
-    tiempo_interaccion_mentor_minutos = models.FloatField(default=0)
+    entry_frequency = models.PositiveIntegerField(default=0)
+    current_streak_days = models.PositiveIntegerField(default=0)
+    max_streak_days = models.PositiveIntegerField(default=0)
+    app_time_min = models.FloatField(default=0)
+    mentor_interaction_time_min = models.FloatField(default=0)
     
     # --- DATOS DE PROGRESO ---
     
-    cantidad_videos_vistos = models.PositiveIntegerField(default=0)
-    tiempo_api_youtube_minutos = models.FloatField(default=0)
-    desafios_completados = models.PositiveIntegerField(default=0)
+    watched_videos_count = models.PositiveIntegerField(default=0)
+    youtube_api_time_min = models.FloatField(default=0)
+    completed_challenges = models.PositiveIntegerField(default=0)
 
     last_connection = models.DateTimeField(
         null=True, blank=True,
@@ -330,3 +336,29 @@ def is_professor(self):
 
 # Le inyectamos la propiedad dinámicamente al modelo User de Django
 User.add_to_class('is_professor', is_professor)
+
+
+# ── Email de bienvenida post-registro ───────────────────────────────────────
+@receiver(post_save, sender=User)
+def send_email_post_register(sender, instance, created, **kwargs):
+    """Envía un mail de bienvenida al crear un User. Corre en un hilo aparte
+    para no bloquear la respuesta del registro con la latencia del SMTP."""
+    if not created:
+        return
+
+    subject = 'Bienvenido a Mentor Virtual'
+    message = f'Hola {instance.username}, tu registro ha sido exitoso.'
+    from_email = settings.DEFAULT_FROM_EMAIL
+    recipient_list = [instance.email]
+
+    def send_async():
+        try:
+            send_mail(subject, message, from_email, recipient_list, fail_silently=False)
+            logger.info(f"Email de bienvenida enviado a {instance.email}")
+        except Exception as e:
+            logger.error(
+                f"Fallo al enviar email de bienvenida a {instance.email}: {e}",
+                exc_info=True
+            )
+
+    threading.Thread(target=send_async, daemon=True).start()

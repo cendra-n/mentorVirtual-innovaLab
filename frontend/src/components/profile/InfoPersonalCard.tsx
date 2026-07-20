@@ -1,5 +1,4 @@
 import { useState, useEffect } from 'react'
-import { withEnglishFallback, readField } from '../../utils/studentProfileFields'
 import { apiGeoCountries, apiGeoProvinces, apiUpdateProfile } from '../../services/api'
 import GeoLocalityAutocomplete from '../GeoLocalityAutocomplete'
 
@@ -43,7 +42,7 @@ export default function InfoPersonalCard({ user, onUserUpdated }: Props) {
   const displayName = user?.first_name || user?.username || '...'
 
   useEffect(() => {
-    setEditFechaNac(readField(user, 'fecha_nacimiento') || '')
+    setEditFechaNac(user?.birth_date || '')
     setEditCountry(user?.country_residence?.country_id || '')
     setEditProvince(user?.province_residence?.province_id || '')
     setEditLocality(user?.locality_residence?.locality_id || '')
@@ -78,7 +77,7 @@ export default function InfoPersonalCard({ user, onUserUpdated }: Props) {
       await fetch(`${BASE}/auth/profile/student/update/`, {
         method: 'PATCH',
         headers: headers(),
-        body: JSON.stringify(withEnglishFallback({ fecha_nacimiento: editFechaNac })),
+        body: JSON.stringify({ birth_date: editFechaNac }),
       })
       setProfileMsg('✅ Perfil actualizado.')
       setEditMode(false)

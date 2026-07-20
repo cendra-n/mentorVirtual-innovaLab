@@ -1,20 +1,23 @@
 import { useState } from 'react'
 import Dashboard from './pages/Dashboard'
 import Login from './pages/Login'
+import Landing from './pages/Landing'
 import Onboarding from './pages/Onboarding'
+import { apiLogout } from './services/api'
 import './App.css'
 
-type Screen = 'login' | 'onboarding' | 'dashboard'
+type Screen = 'landing' | 'login' | 'onboarding' | 'dashboard'
 
 export default function App() {
   const [screen, setScreen] = useState<Screen>(() => {
-    // Si ya hay token guardado, va directo al dashboard
-    // (el onboarding solo se muestra inmediatamente después de registrarse)
-    if (!localStorage.getItem('access_token')) return 'login'
+    // Sin token: primero la landing pública. Con token: directo al dashboard
+    // (el onboarding solo se muestra inmediatamente después de registrarse).
+    if (!localStorage.getItem('access_token')) return 'landing'
     if (localStorage.getItem('onboarding_pending') === 'true') return 'onboarding'
     return 'dashboard'
   })
   const [onboardingToken, setOnboardingToken] = useState<string | null>(null)
+  const [authMode, setAuthMode] = useState<'login' | 'register'>('login')
 
   const handleLogin = (access: string, refresh: string) => {
     localStorage.removeItem('chat_recientes')
@@ -38,11 +41,15 @@ export default function App() {
   }
 
   const handleLogout = () => {
+    const refreshToken = localStorage.getItem('refresh_token')
+    if (refreshToken) {
+      apiLogout(refreshToken).catch(() => {})  // best-effort, no bloquea el logout
+    }
     localStorage.removeItem('access_token')
     localStorage.removeItem('refresh_token')
     localStorage.removeItem('chat_recientes')
     setOnboardingToken(null)
-    setScreen('login')
+    setScreen('landing')
   }
 
   if (screen === 'dashboard') {
@@ -58,10 +65,21 @@ export default function App() {
     )
   }
 
+  if (screen === 'login') {
+    return (
+      <Login
+        initialMode={authMode}
+        onLogin={handleLogin}
+        onRegisterSuccess={handleRegisterSuccess}
+        onBackToLanding={() => setScreen('landing')}
+      />
+    )
+  }
+
   return (
-    <Login
-      onLogin={handleLogin}
-      onRegisterSuccess={handleRegisterSuccess}
+    <Landing
+      onIniciarSesion={() => { setAuthMode('login'); setScreen('login') }}
+      onRegistrarse={() => { setAuthMode('register'); setScreen('login') }}
     />
   )
 }

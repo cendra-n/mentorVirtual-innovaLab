@@ -34,11 +34,30 @@ Notas para QA:
 
 from django.contrib.auth.models import User
 from django.urls import reverse
+from django.core.cache import cache
+from django.core import mail
+from django.test import override_settings
+from unittest.mock import patch
 from rest_framework import status
 from rest_framework.test import APITestCase
 from rest_framework_simplejwt.tokens import RefreshToken
+from .models import UserActivityLog
 
 
+class ImmediateThread:
+    """Reemplazo sincrónico de threading.Thread para tests: corre el target
+    al toque en vez de en un hilo aparte, así los asserts sobre el resultado
+    (ej. mail.outbox) son deterministas y no dependen de timing."""
+    def __init__(self, target=None, args=(), kwargs=None, daemon=None):
+        self.target = target
+        self.args = args
+        self.kwargs = kwargs or {}
+
+    def start(self):
+        self.target(*self.args, **self.kwargs)
+
+
+@patch('users.models.threading.Thread', ImmediateThread)
 class UserEndpointsTestCase(APITestCase):
 
     def setUp(self):
@@ -46,6 +65,12 @@ class UserEndpointsTestCase(APITestCase):
         Crea el usuario de prueba base con perfil y config de accesibilidad.
         is_staff=True es necesario para el test de listado de usuarios.
         """
+        # LoginRateThrottle/RegisterRateThrottle usan el cache por defecto
+        # (LocMemCache), que persiste entre tests dentro de la misma corrida.
+        # Sin este clear(), tests que llaman a login/register muchas veces
+        # en la suite completa pueden empezar a devolver 429 sin motivo.
+        cache.clear()
+
         self.user = User.objects.create_user(
             username='testuser',
             password='testpassword123!',
@@ -69,6 +94,12 @@ class UserEndpointsTestCase(APITestCase):
         self.refresh           = RefreshToken.for_user(self.user)
         self.access_token      = str(self.refresh.access_token)
         self.refresh_token_str = str(self.refresh)
+
+        # create_user() de arriba dispara send_email_post_register (post_save
+        # sobre User) para 'testuser' en TODOS los tests de esta clase, no
+        # solo en los que prueban registro. Sin este clear(), cualquier test
+        # que después revise mail.outbox arranca con ese email ya adentro.
+        mail.outbox = []
 
     # ── REGISTRO ──────────────────────────────────────────────────────────────
 
@@ -300,21 +331,21 @@ class UserEndpointsTestCase(APITestCase):
         url = reverse('update-student-profile')
         self.client.credentials(HTTP_AUTHORIZATION='Bearer ' + self.access_token)
         data = {
-            'nivel_educativo': 'secundario_completo',
-            'estado_laboral': 'activo',
-            'genero': 'ND',
-            'objetivo_principal': 'empleo',
-            'disponibilidad_tiempo': 'alta',
-            'intereses': ['Programación', 'Ciencia de Datos']
+            'education_level': 'secundario_completo',
+            'employment_status': 'activo',
+            'user_gender': 'ND',
+            'primary_objective': 'empleo',
+            'time_availability': 'alta',
+            'user_interests': ['Programación', 'Ciencia de Datos']
         }
         response = self.client.patch(url, data, format='json')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(response.data['nivel_educativo'], 'secundario_completo')
-        self.assertEqual(response.data['estado_laboral'], 'activo')
-        self.assertEqual(response.data['genero'], 'ND')
-        self.assertEqual(response.data['objetivo_principal'], 'empleo')
-        self.assertEqual(response.data['disponibilidad_tiempo'], 'alta')
-        self.assertEqual(response.data['intereses'], ['Programación', 'Ciencia de Datos'])
+        self.assertEqual(response.data['education_level'], 'secundario_completo')
+        self.assertEqual(response.data['employment_status'], 'activo')
+        self.assertEqual(response.data['user_gender'], 'ND')
+        self.assertEqual(response.data['primary_objective'], 'empleo')
+        self.assertEqual(response.data['time_availability'], 'alta')
+        self.assertEqual(response.data['user_interests'], ['Programación', 'Ciencia de Datos'])
 
     def test_api_update_student_profile_unauthorized(self):
         """El endpoint requiere autenticación — devuelve 401 sin token."""
@@ -327,14 +358,120 @@ class UserEndpointsTestCase(APITestCase):
         url = reverse('update-student-profile')
         self.client.credentials(HTTP_AUTHORIZATION='Bearer ' + self.access_token)
         data = {
-            'tiempo_acumulado_app_minutos': 999.9,
-            'racha_actual_dias': 50,
-            'cantidad_videos_vistos': 100
+            'app_time_min': 999.9,
+            'current_streak_days': 50,
+            'watched_videos_count': 100
         }
         response = self.client.patch(url, data, format='json')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         # El perfil del estudiante en la base de datos debe seguir con los valores por defecto (0)
-        self.assertEqual(response.data['tiempo_acumulado_app_minutos'], 0.0)
-        self.assertEqual(response.data['racha_actual_dias'], 0)
-        self.assertEqual(response.data['cantidad_videos_vistos'], 0)
+        self.assertEqual(response.data['app_time_min'], 0.0)
+        self.assertEqual(response.data['current_streak_days'], 0)
+        self.assertEqual(response.data['watched_videos_count'], 0)
+
+    # ── AUDITORÍA DE SESIÓN (UserActivityLog) ─────────────────────────────────
+
+    def test_api_login_creates_activity_log_and_online_status(self):
+        """Login exitoso debe registrar un UserActivityLog de tipo LOGIN y
+        marcar session_status='ONLINE' en el perfil."""
+        url  = reverse('api_login')
+        data = {'email': 'testuser@example.com', 'password': 'testpassword123!'}
+        response = self.client.post(url, data, format='json')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        self.assertTrue(
+            UserActivityLog.objects.filter(user=self.user, event_type='login').exists()
+        )
+        self.user.profile.refresh_from_db()
+        self.assertEqual(self.user.profile.session_status, 'ONLINE')
+
+    def test_api_logout_creates_activity_log_and_offline_status(self):
+        """Logout debe registrar un UserActivityLog de tipo LOGOUT y marcar
+        session_status='OFFLINE', incluso si el refresh token ya no es válido
+        (la escritura del log no depende de que el blacklist tenga éxito)."""
+        url  = reverse('api_logout')
+        self.client.credentials(HTTP_AUTHORIZATION='Bearer ' + self.access_token)
+        data = {'refresh': self.refresh_token_str}
+        response = self.client.post(url, data, format='json')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        self.assertTrue(
+            UserActivityLog.objects.filter(user=self.user, event_type='logout').exists()
+        )
+        self.user.profile.refresh_from_db()
+        self.assertEqual(self.user.profile.session_status, 'OFFLINE')
+
+    # ── RATE LIMITING (throttling) ────────────────────────────────────────────
+
+    def test_api_login_rate_limited_after_3_attempts(self):
+        """LoginRateThrottle: al 4to intento en el mismo minuto, devuelve 429
+        sin importar si las credenciales son correctas o no."""
+        url  = reverse('api_login')
+        data = {'email': 'testuser@example.com', 'password': 'wrongpassword!'}
+        for _ in range(3):
+            response = self.client.post(url, data, format='json')
+            self.assertNotEqual(response.status_code, status.HTTP_429_TOO_MANY_REQUESTS)
+
+        response = self.client.post(url, data, format='json')
+        self.assertEqual(response.status_code, status.HTTP_429_TOO_MANY_REQUESTS)
+
+    def test_api_register_rate_limited_after_3_attempts(self):
+        """RegisterRateThrottle: al 4to intento en el mismo minuto, devuelve
+        429 — protege contra alta masiva de cuentas."""
+        url  = reverse('api_register')
+        data = {
+            'username': 'ratelimited',
+            'password': 'Password123!',
+            'password_confirm': 'Password123!',
+            'email': 'ratelimited@example.com',
+        }
+        for _ in range(3):
+            response = self.client.post(url, data, format='json')
+            self.assertNotEqual(response.status_code, status.HTTP_429_TOO_MANY_REQUESTS)
+
+        response = self.client.post(url, data, format='json')
+        self.assertEqual(response.status_code, status.HTTP_429_TOO_MANY_REQUESTS)
+
+    def test_login_and_register_throttles_are_independent(self):
+        """LoginRateThrottle y RegisterRateThrottle deben tener scopes propios
+        ('login'/'register'), no compartir el balde 'anon' por default de
+        AnonRateThrottle — si lo compartieran, alternar entre los dos
+        endpoints agotaría el límite combinado en vez de 3 + 3 independientes."""
+        login_url    = reverse('api_login')
+        register_url = reverse('api_register')
+        login_data   = {'email': 'testuser@example.com', 'password': 'wrongpassword!'}
+
+        for i in range(3):
+            response = self.client.post(login_url, login_data, format='json')
+            self.assertNotEqual(response.status_code, status.HTTP_429_TOO_MANY_REQUESTS)
+
+            register_data = {
+                'username': f'indep{i}',
+                'password': 'Password123!',
+                'password_confirm': 'Password123!',
+                'email': f'indep{i}@example.com',
+            }
+            response = self.client.post(register_url, register_data, format='json')
+            self.assertNotEqual(response.status_code, status.HTTP_429_TOO_MANY_REQUESTS)
+
+    @override_settings(EMAIL_BACKEND='django.core.mail.backends.locmem.EmailBackend')
+    def test_api_register_sends_welcome_email(self):
+        """Al registrarse, la señal send_email_post_register debe encolar un
+        mail de bienvenida al address del usuario nuevo. Se parchea
+        threading.Thread para que corra sincrónico y el assert sea
+        determinista (sin sleep/polling)."""
+        url  = reverse('api_register')
+        data = {
+            'username': 'nuevoconemail',
+            'password': 'Password123!',
+            'password_confirm': 'Password123!',
+            'email': 'nuevoconemail@example.com',
+        }
+        response = self.client.post(url, data, format='json')
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertEqual(mail.outbox[0].to, ['nuevoconemail@example.com'])
+        self.assertIn('Bienvenido', mail.outbox[0].subject)
+
 

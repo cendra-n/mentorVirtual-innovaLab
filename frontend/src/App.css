@@ -1910,3 +1910,19 @@ select.auth-input:disabled { opacity: 0.6; cursor: not-allowed; }
   40%      { transform: rotate(-4deg); }
   50%      { transform: rotate(2deg); }
 }
+
+
+/* Botón "Volver" en Login/Registro cuando se llega desde la Landing */
+.auth-back-link {
+  background: none;
+  border: none;
+  color: var(--marino, #031F46);
+  font-size: 0.9rem;
+  font-weight: 600;
+  padding: 1rem 1.5rem 0;
+  cursor: pointer;
+  align-self: flex-start;
+}
+.auth-back-link:hover {
+  text-decoration: underline;
+}

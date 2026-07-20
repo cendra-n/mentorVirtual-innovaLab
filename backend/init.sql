@@ -381,7 +381,13 @@ $$ LANGUAGE plpgsql;
 CREATE OR REPLACE FUNCTION sp_update_streak(p_user_id INT)
 RETURNS TABLE(current_streak INT, longest_streak INT, last_activity DATE) AS $$
 DECLARE
-    v_today         DATE := CURRENT_DATE;
+    -- CURRENT_DATE depende del timezone de sesión/servidor de Postgres, que
+    -- por default cae en UTC (el servicio postgres del docker-compose no fija
+    -- TZ). Sin esto, un usuario que completa algo entre 21:00 y 23:59 hora
+    -- Argentina ya cuenta como "día siguiente" para Postgres y la racha se
+    -- calcula mal. Fijamos la zona horaria explícitamente acá, sin depender
+    -- de la configuración del contenedor.
+    v_today         DATE := (NOW() AT TIME ZONE 'America/Argentina/Buenos_Aires')::DATE;
     v_last_activity DATE;
     v_current       INT;
     v_longest       INT;

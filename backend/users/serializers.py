@@ -370,76 +370,76 @@ class StudentProfileSerializer(serializers.ModelSerializer):
         # Se excluye el 'user' porque ya viene del contexto del token (request.user)
         exclude = ['user']
         extra_kwargs = {
-            'fecha_nacimiento': {
+            'birth_date': {
                 'label': 'Fecha de nacimiento',
                 'help_text': 'Fecha de nacimiento en formato YYYY-MM-DD.',
                 'required': False
             },
-            'nivel_educativo': {
+            'education_level': {
                 'label': 'Nivel Educativo',
                 'help_text': 'Nivel educativo alcanzado (ej: primario_completo, secundario_completo).',
                 'required': False
             },
-            'estado_laboral': {
+            'employment_status': {
                 'label': 'Estado laboral',
                 'help_text': 'Situación laboral actual (activo, desempleado).',
                 'required': False
             },
-            'intereses': {
+            'user_interests': {
                 'label': 'Intereses',
                 'help_text': 'Lista de intereses como arreglo de strings, ej: ["Programación", "Diseño"].',
                 'required': False
             },
-            'genero': {
+            'user_gender': {
                 'label': 'Género',
                 'help_text': 'Género (M, F, NB, ND).',
                 'required': False
             },
-            'objetivo_principal': {
+            'primary_objective': {
                 'label': 'Objetivo principal',
                 'help_text': 'Motivación principal para usar la app (empleo, personal, estudios, hobby).',
                 'required': False
             },
-            'disponibilidad_tiempo': {
+            'time_availability': {
                 'label': 'Disponibilidad de tiempo',
                 'help_text': 'Tiempo estimado disponible semanalmente (baja, media, alta).',
                 'required': False
             },
-            'zona_horaria': {
+            'time_zone': {
                 'label': 'Zona horaria',
             },
-            'frecuencia_entradas': {
+            'entry_frequency': {
                 'read_only': True,
                 'min_value': 0,
                 'max_value': 10000
             },
-            'racha_actual_dias': {
+            'current_streak_days': {
                 'read_only': True,
                 'min_value': 0,
                 'max_value': 3650
             },
-            'racha_maxima_dias': {
+            'max_streak_days': {
                 'read_only': True,
                 'min_value': 0,
                 'max_value': 3650
             },
-            'tiempo_acumulado_app_minutos': {
+            'app_time_min': {
                 'read_only': True,
                 'min_value': 0.0
             },
-            'tiempo_interaccion_mentor_minutos': {
+            'mentor_interaction_time_min': {
                 'read_only': True,
                 'min_value': 0.0
             },
-            'cantidad_videos_vistos': {
+            'watched_videos_count': {
                 'read_only': True,
                 'min_value': 0
             },
-            'tiempo_api_youtube_minutos': {
+            'youtube_api_time_min': {
                 'read_only': True,
                 'min_value': 0.0
             },
-            'desafios_completados': {
+            'completed_challenges': {
                 'read_only': True,
                 'min_value': 0
             },

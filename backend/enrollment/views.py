@@ -1,3 +1,4 @@
+from enrollment.signals import trigger_enrollment_email
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
@@ -109,7 +110,10 @@ class EnrollStudentAPIView(APIView):
         course_id = serializer.validated_data['course_id']
         
         enrollment_id = enroll_student_in_course(student_id, course_id)
-        
+
+        # Disparamos el correo sin bloquear el retorno
+        trigger_enrollment_email(request.user, course_id)
+
         return Response(
             {
                 "message": "Felicidades te has inscripto correctamente al curso.",

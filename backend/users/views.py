@@ -10,6 +10,8 @@ Combina:
 - Paginación en listado de usuarios
 """
 import logging # <-- IMPORTANTE: Módulo para registrar los errores en el servidor
+from rest_framework.throttling import AnonRateThrottle
+from rest_framework.decorators import throttle_classes
 from .serializers import StudentProfileSerializer, CountrySerializer, ProvinceSerializer, LocalitySerializer
 from .models import StudentProfile, EventTypes, UserActivityLog
 from django.utils.timezone import now
@@ -18,6 +20,19 @@ from django.contrib.auth.models import User
 from django.contrib.auth.hashers import make_password
 from rest_framework.decorators import api_view, permission_classes, authentication_classes
 from rest_framework.permissions import AllowAny, IsAuthenticated, IsAdminUser 
+
+# ── Rate limiting (throttling) para login/register ────────────────────────────
+class LoginRateThrottle(AnonRateThrottle):
+    # Máximo 3 intentos de login por minuto por IP.
+    # scope propio: sin esto, hereda 'anon' de AnonRateThrottle y comparte
+    # balde de cache con RegisterRateThrottle (misma IP agota las dos juntas).
+    scope = 'login'
+    rate = '3/min'
+
+class RegisterRateThrottle(AnonRateThrottle):
+    # Máximo 3 registros por minuto por IP, evita creación masiva de cuentas falsas.
+    scope = 'register'
+    rate = '3/min'
 from rest_framework.response import Response
 from rest_framework import status, serializers
 from .pagination import CustomPagination
@@ -75,6 +90,7 @@ def _tokens_for_user(user):
 @api_view(['POST'])
 @authentication_classes([])
 @permission_classes([AllowAny])
+@throttle_classes([LoginRateThrottle])
 def api_login(request):
     serializer = LoginRequestSerializer(data=request.data)
     if not serializer.is_valid():
@@ -154,6 +170,7 @@ def api_login(request):
 @api_view(['POST'])
 @authentication_classes([])
 @permission_classes([AllowAny])
+@throttle_classes([RegisterRateThrottle])
 def api_register(request):
     serializer = RegisterRequestSerializer(data=request.data)
     if not serializer.is_valid():
@@ -284,7 +301,7 @@ def api_profile(request):
             'date_joined': user.date_joined,
             'phone':      profile.phone      if profile else '',
             'avatar_url': profile.avatar_url if profile else '',
-            'fecha_nacimiento': student_profile.fecha_nacimiento if student_profile else None,
+            'birth_date': student_profile.birth_date if student_profile else None,
             'country_residence':  CountrySerializer(profile.country_residence).data if profile and profile.country_residence else None,
             'province_residence': ProvinceSerializer(profile.province_residence).data if profile and profile.province_residence else None,
             'locality_residence': LocalitySerializer(profile.locality_residence).data if profile and profile.locality_residence else None,
@@ -445,7 +462,7 @@ def api_users_list(request):
 @extend_schema(
     methods=['GET'],
     summary="Obtener perfil de estudiante",
-    description="Devuelve los datos del perfil demográfico y de intereses del estudiante autenticado (incluye fecha_nacimiento).",
+    description="Devuelve los datos del perfil demográfico y de intereses del estudiante autenticado (incluye birth_date).",
     responses={200: StudentProfileSerializer}
 )
 @extend_schema(

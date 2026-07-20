@@ -43,6 +43,16 @@ export const apiLogin = (email: string, password: string): Promise<ApiResult> =>
     body: JSON.stringify({ email, password }),
   }).then(async r => ({ ok: r.ok, status: r.status, data: await r.json() }))
 
+export const apiLogout = (refreshToken: string): Promise<ApiResult> =>
+  fetch(`${BASE}/auth/logout/`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${localStorage.getItem('access_token')}`,
+    },
+    body: JSON.stringify({ refresh: refreshToken }),
+  }).then(async r => ({ ok: r.ok, status: r.status, data: await r.json() }))
+
 export const apiRegister = (
   username: string,
   email: string,
@@ -88,9 +98,9 @@ export const apiGeoLocalities = (provinceId: number | string, search?: string): 
 
 export const apiUpdateStudentProfile = (
   accessToken: string,
-  // Acepta cualquier campo de StudentProfile — hoy en español, más su
-  // versión en inglés (ver utils/studentProfileFields.ts) mientras dura
-  // la migración del backend.
+  // Acepta cualquier campo de StudentProfile en inglés (birth_date,
+  // education_level, employment_status, user_gender, primary_objective,
+  // time_availability, user_interests, etc.) — migración ES→EN completa.
   data: Record<string, any>
 ): Promise<ApiResult> =>
   fetch(`${BASE}/auth/profile/student/update/`, {

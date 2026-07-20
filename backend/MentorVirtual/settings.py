@@ -263,3 +263,56 @@ GOALS_PLAN_MAX_TOKENS = int(os.environ.get('GOALS_PLAN_MAX_TOKENS', 2048))
 MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
 X_FRAME_OPTIONS = 'SAMEORIGIN'
+
+# ── Email (notificaciones de registro / inscripción) ───────────────────────────
+# Todos los valores salen de .env — nunca hardcodear credenciales acá.
+EMAIL_BACKEND = os.environ.get('EMAIL_BACKEND', 'django.core.mail.backends.console.EmailBackend')
+EMAIL_HOST = os.environ.get('EMAIL_HOST', 'smtp.gmail.com')
+EMAIL_PORT = int(os.environ.get('EMAIL_PORT', 587))
+EMAIL_USE_SSL = os.environ.get('EMAIL_USE_SSL', 'False') == 'True'
+EMAIL_USE_TLS = os.environ.get('EMAIL_USE_TLS', 'False') == 'True'
+EMAIL_HOST_USER = os.environ.get('EMAIL_HOST_USER', '')
+EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_HOST_PASSWORD', '')
+DEFAULT_FROM_EMAIL = os.environ.get('DEFAULT_FROM_EMAIL', EMAIL_HOST_USER)
+
+# ── Logging (consola + archivo de errores persistente) ─────────────────────────
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'formatters': {
+        'verbose': {
+            'format': '[{levelname}] {asctime} | {module}.{funcName} | {message}',
+            'style': '{',
+        },
+    },
+    'handlers': {
+        'file_errors': {
+            'level': 'ERROR',
+            'class': 'logging.FileHandler',
+            'filename': BASE_DIR / 'errors.log',
+            'formatter': 'verbose',
+        },
+        'console': {
+            'level': 'INFO',
+            'class': 'logging.StreamHandler',
+            'formatter': 'verbose',
+        },
+    },
+    'loggers': {
+        'django': {
+            'handlers': ['console', 'file_errors'],
+            'level': 'INFO',
+            'propagate': True,
+        },
+        'users': {
+            'handlers': ['console', 'file_errors'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+        'enrollment': {
+            'handlers': ['console', 'file_errors'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+    },
+}
