@@ -3,6 +3,7 @@ import { useRegisterForm } from '../../hooks/useRegisterForm'
 import { getPasswordChecks } from '../../utils/authValidation'
 import GeneroCard from './GeneroCard'
 import { UserIcon, CalendarIcon, MailIcon, LockIcon, RocketIcon, GoogleIcon, EyeIcon, EyeOffIcon, CheckIcon, UserPlusIcon } from './AuthIcons'
+import GeoLocalityAutocomplete from '../GeoLocalityAutocomplete'
 import avatarFem from '../../assets/avatar-femenino.svg'
 import avatarMasc from '../../assets/avatar-masculino.svg'
 import avatarNoDecir from '../../assets/avatar-prefiero-no-decir.svg'
@@ -25,6 +26,8 @@ export default function RegisterForm({ onRegisterSuccess }: Props) {
     loading,
     isSubmitDisabled,
     handleSubmit,
+    countries, provinces, country, setCountry, province, setProvince, geoLoading,
+    locality, localityName, setLocality, setLocalityName,
   } = useRegisterForm(onRegisterSuccess)
 
   const [showPass, setShowPass] = useState(false)
@@ -95,6 +98,51 @@ export default function RegisterForm({ onRegisterSuccess }: Props) {
           <GeneroCard active={genero === 'ND'} label="Prefiero no decir" avatar={avatarNoDecir} onClick={() => { setGenero('ND'); clearFieldError('genero') }} />
         </div>
         {fieldErrors.genero && <span className="form-error">⚠️ {fieldErrors.genero}</span>}
+
+        <div className="auth-row">
+          <div className="auth-col">
+            <label>País <span className="auth-label-opcional">(opcional)</span></label>
+            <select
+              className="auth-input"
+              value={country}
+              onChange={e => setCountry(e.target.value ? Number(e.target.value) : '')}
+            >
+              <option value="">Seleccionar...</option>
+              {countries.map(c => (
+                <option key={c.country_id} value={c.country_id}>{c.country_name}</option>
+              ))}
+            </select>
+          </div>
+          <div className="auth-col">
+            <label>Provincia <span className="auth-label-opcional">(opcional)</span></label>
+            <select
+              className="auth-input"
+              value={province}
+              onChange={e => { setProvince(e.target.value ? Number(e.target.value) : ''); setLocality(''); setLocalityName('') }}
+              disabled={!country || geoLoading}
+            >
+              <option value="">{geoLoading ? 'Cargando...' : 'Seleccionar...'}</option>
+              {provinces.map(p => (
+                <option key={p.province_id} value={p.province_id}>{p.province_name}</option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        <div className="auth-row">
+          <div className="auth-col">
+            <label>Localidad <span className="auth-label-opcional">(opcional)</span></label>
+            <GeoLocalityAutocomplete
+              provinceId={province}
+              value={locality}
+              valueName={localityName}
+              onChange={(id, name) => { setLocality(id); setLocalityName(name) }}
+              disabled={!province}
+              className="auth-input"
+              placeholder={!province ? 'Elegí una provincia primero' : 'Escribí para buscar...'}
+            />
+          </div>
+        </div>
 
         <div className="auth-row">
           <div className="auth-col">

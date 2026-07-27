@@ -28,7 +28,7 @@ export default function PasoExito({ onComplete }: Props) {
           <div className="auth-header-logo-icon">
             <LogoIcon />
           </div>
-          <span>Impulsa</span>
+          <span>{import.meta.env.VITE_APP_NAME || 'Impulsa'}</span>
         </div>
       </header>
       <div className="auth-card-wrapper">

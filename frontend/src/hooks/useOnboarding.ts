@@ -1,7 +1,6 @@
 import { useState } from 'react'
 import { apiUpdateStudentProfile } from '../services/api'
 import { ESTADO_LABORAL_MAP, DISPONIBILIDAD_MAP, NivelEducativo } from '../utils/onboardingData'
-import { withEnglishFallback } from '../utils/studentProfileFields'
 
 /**
  * Toda la lógica del flujo de Onboarding: estado de cada paso,
@@ -23,7 +22,7 @@ export function useOnboarding(accessToken: string) {
 
   const guardarPaso = async (datos: Record<string, any>) => {
     try {
-      await apiUpdateStudentProfile(accessToken, withEnglishFallback(datos))
+      await apiUpdateStudentProfile(accessToken, datos)
     } catch {
       console.warn('No se pudo guardar el paso, continuando igual.')
     }
@@ -32,19 +31,19 @@ export function useOnboarding(accessToken: string) {
   const siguiente = async () => {
     setLoading(true)
     if (paso === 1) {
-      await guardarPaso({ intereses })
+      await guardarPaso({ user_interests: intereses })
     } else if (paso === 2) {
       const valorBackend = ESTADO_LABORAL_MAP[estadoLaboral]
-      if (valorBackend) await guardarPaso({ estado_laboral: valorBackend })
+      if (valorBackend) await guardarPaso({ employment_status: valorBackend })
     } else if (paso === 3) {
       // No mandamos nada al backend si no se eligió nada, o si el
       // usuario explícitamente prefirió no decirlo.
       if (nivelEducativo && nivelEducativo !== 'prefiero_no_decir') {
-        await guardarPaso({ nivel_educativo: nivelEducativo })
+        await guardarPaso({ education_level: nivelEducativo })
       }
     } else if (paso === 4) {
       const valorBackend = DISPONIBILIDAD_MAP[horario]
-      if (valorBackend) await guardarPaso({ disponibilidad_tiempo: valorBackend })
+      if (valorBackend) await guardarPaso({ time_availability: valorBackend })
     } else if (paso === 5) {
       // TODO: backend no tiene campo para recordatorios todavía.
       // Guardamos preferencia en localStorage como placeholder.

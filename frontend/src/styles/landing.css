@@ -1,0 +1,510 @@
+/* Estilos de la Landing page pública (pedida por UX/UI).
+   Namespace: landing-* — para no colisionar con clases de otras pantallas
+   (mismo criterio que "profile-logro-*" en Profile).
+   Este archivo se importa desde Landing.tsx (no vía @import en App.css,
+   para evitar el problema de los @import fuera del inicio del archivo). */
+
+.landing-page {
+  /* Alias locales apuntando a la paleta global de la app (App.css :root),
+     para que la landing use exactamente los mismos colores que el resto
+     de las pantallas refactorizadas. */
+  --landing-navy: var(--marino, #101E37);
+  --landing-blue: var(--azul, #336ACC);
+  --landing-bg: var(--gris-claro, #F3F6F9);
+  color: var(--marino, #101E37);
+  background: var(--landing-bg);
+  font-family: var(--ff, 'Plus Jakarta Sans', system-ui, sans-serif);
+}
+
+.landing-hero,
+.landing-features,
+.landing-cta,
+.landing-footer {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding-left: 24px;
+  padding-right: 24px;
+  box-sizing: border-box;
+}
+
+/* Mismo formato que el header de Login/Registro (.auth-header):
+   barra blanca de ancho completo con borde inferior. */
+.landing-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: white;
+  border-bottom: 1px solid var(--gris-borde, #E6EBF0);
+  padding: 14px 32px;
+}
+
+.landing-logo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-weight: 800;
+  font-size: 16px;
+  color: var(--landing-navy);
+}
+
+.landing-logo-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  background: var(--landing-navy);
+}
+
+.landing-header-actions {
+  display: flex;
+  gap: 24px; /* misma separación que .auth-header-nav en Login/Registro */
+}
+
+/* Botones con la misma métrica y hover que .auth-header-btn. */
+.landing-btn {
+  border: none;
+  border-radius: 50px;
+  padding: 9px 20px;
+  font-weight: 600;
+  font-size: 13px;
+  cursor: pointer;
+  transition: background .2s, color .2s, transform .1s;
+}
+
+.landing-btn-primary {
+  background: var(--landing-navy);
+  color: #fff;
+}
+.landing-btn-primary:hover {
+  background: var(--azul-dark, #1a4a9e);
+  transform: translateY(-1px);
+}
+
+.landing-btn-ghost {
+  background: var(--azul-sutil, #D6E1F5);
+  color: var(--landing-navy);
+}
+.landing-btn-ghost:hover {
+  background: var(--landing-blue);
+  color: white;
+  transform: translateY(-1px);
+}
+
+.landing-btn-lg {
+  padding: 13px 28px;
+  font-size: 14px;
+}
+
+.landing-btn-light {
+  background: #fff;
+  color: var(--landing-navy);
+}
+.landing-btn-light:hover {
+  background: var(--azul-sutil, #D6E1F5);
+  transform: translateY(-1px);
+}
+
+.landing-hero {
+  display: flex;
+  align-items: center;
+  gap: 40px;
+  padding-top: 64px;
+  padding-bottom: 64px;
+  flex-wrap: wrap;
+}
+
+.landing-hero-text {
+  flex: 1 1 420px;
+}
+
+.landing-badge {
+  display: inline-block;
+  background: var(--azul-sutil, #D6E1F5);
+  color: var(--landing-blue);
+  font-size: 0.8rem;
+  font-weight: 600;
+  padding: 6px 14px;
+  border-radius: 999px;
+  margin-bottom: 20px;
+}
+
+.landing-hero-text h1 {
+  font-size: 2.4rem;
+  line-height: 1.2;
+  color: var(--landing-navy);
+  margin: 0 0 16px;
+}
+
+.landing-highlight {
+  color: var(--landing-blue);
+  text-decoration: underline;
+}
+
+.landing-hero-text p {
+  color: var(--gris-medio, #6B7A99);
+  font-size: 1.05rem;
+  line-height: 1.6;
+  margin: 0 0 28px;
+  max-width: 480px;
+}
+
+.landing-social-proof {
+  margin-top: 16px;
+  font-size: 0.85rem;
+  color: #7a8399;
+}
+
+.landing-hero-image {
+  flex: 1 1 260px;
+  display: flex;
+  justify-content: center;
+}
+
+.landing-features {
+  text-align: center;
+  padding-top: 40px;
+  padding-bottom: 64px;
+}
+
+.landing-eyebrow {
+  display: inline-block;
+  background: white;
+  border: 1px solid var(--gris-borde, #E6EBF0);
+  color: var(--landing-navy);
+  font-size: 0.8rem;
+  font-weight: 600;
+  padding: 6px 14px;
+  border-radius: 999px;
+  margin-bottom: 16px;
+}
+
+.landing-features h2 {
+  font-size: 1.8rem;
+  color: var(--landing-navy);
+  margin: 0 0 12px;
+}
+
+.landing-features-sub {
+  color: var(--gris-medio, #6B7A99);
+  max-width: 560px;
+  margin: 0 auto 40px;
+}
+
+.landing-feature-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 20px;
+}
+
+.landing-feature-card {
+  background: #eef4ff;
+  border-radius: 16px;
+  padding: 28px 24px;
+  text-align: left;
+  /* Sin hover a propósito: estas tarjetas no son clickeables, y el
+     efecto de levantada sugeriría una interacción que no existe
+     (las goal-card del Dashboard sí lo tienen porque sí se clickean). */
+}
+
+.landing-feature-tag {
+  display: block;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--landing-blue);
+  margin: 12px 0 8px;
+}
+
+.landing-feature-card h3 {
+  color: var(--landing-navy);
+  margin: 0 0 8px;
+}
+
+.landing-feature-card p {
+  color: var(--gris-medio, #6B7A99);
+  font-size: 0.9rem;
+  line-height: 1.5;
+  margin: 0;
+}
+
+.landing-cta {
+  background: var(--landing-navy);
+  border-radius: 20px;
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  padding: 32px 40px;
+  flex-wrap: wrap;
+  /* La caja navy se alinea con el contenido de las otras secciones
+     (que arranca 24px adentro del contenedor de 1100px), y nunca
+     toca los bordes de la pantalla. */
+  width: calc(100% - 48px);
+  max-width: 1052px;
+  margin: 0 auto 64px;
+}
+
+.landing-cta-text {
+  flex: 1;
+}
+
+.landing-cta-text h2 {
+  color: #fff;
+  margin: 0 0 6px;
+  font-size: 1.3rem;
+}
+
+.landing-cta-text p {
+  color: #b7c2dc;
+  margin: 0;
+}
+
+.landing-footer {
+  text-align: center;
+  padding-bottom: 32px;
+  color: #7a8399;
+  font-size: 0.85rem;
+}
+
+.landing-footer-brand {
+  font-weight: 700;
+  color: var(--landing-navy);
+  margin-bottom: 4px;
+}
+
+.landing-footer-links {
+  display: flex;
+  justify-content: center;
+  gap: 20px;
+  margin: 16px 0;
+}
+
+.landing-footer-links a,
+.landing-footer-links .landing-footer-link {
+  color: var(--gris-medio, #6B7A99);
+  text-decoration: none;
+  transition: color .15s;
+  background: none;
+  border: none;
+  font: inherit;
+  cursor: pointer;
+  padding: 0;
+}
+.landing-footer-links a:hover,
+.landing-footer-links .landing-footer-link:hover {
+  color: var(--landing-blue);
+  text-decoration: underline;
+}
+
+.landing-footer-copy {
+  font-size: 0.75rem;
+  color: #a3abbd;
+}
+
+/* ── Social proof con avatares (mockup UX) ─────────────────────────── */
+
+.landing-social-proof {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.landing-avatars {
+  display: inline-flex;
+}
+
+.landing-avatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  color: #fff;
+  font-size: 0.65rem;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid #fff;
+  margin-left: -8px;
+}
+
+.landing-avatar:first-child {
+  margin-left: 0;
+}
+
+/* ── Hero: Pulso con elementos flotantes (mockup UX) ───────────────── */
+
+.landing-pulso-hero {
+  position: relative;
+  padding: 24px 12px 12px;
+}
+
+.landing-pulso-video {
+  width: 300px;
+  max-width: 100%;
+  border-radius: 20px;
+  box-shadow: 0 12px 36px rgba(10, 31, 68, 0.12);
+  display: block;
+}
+
+.landing-pulso-shadow {
+  width: 55%;
+  height: 14px;
+  margin: 4px auto 0;
+  border-radius: 50%;
+  background: rgba(10, 31, 68, 0.12);
+  filter: blur(4px);
+}
+
+.landing-float-card {
+  position: absolute;
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: 0 6px 24px rgba(10, 31, 68, 0.14);
+  font-size: 0.75rem;
+}
+
+.landing-float-racha {
+  top: 0;
+  left: -28px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+}
+
+.landing-float-racha strong {
+  display: block;
+  color: var(--landing-navy);
+  font-size: 0.78rem;
+}
+
+.landing-float-racha small {
+  color: #7a8399;
+  font-size: 0.68rem;
+}
+
+.landing-float-check {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: #e7f8f0;
+  color: #10b981;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.landing-float-xp {
+  top: 56px;
+  right: -20px;
+  padding: 7px 12px;
+  background: #ffd53e;
+  color: #6b4d00;
+  font-weight: 700;
+  border-radius: 999px;
+}
+
+.landing-float-chat {
+  right: -36px;
+  bottom: 30px;
+  background: var(--landing-navy);
+  color: #dbe4f5;
+  padding: 12px 14px;
+  max-width: 190px;
+  border-radius: 14px 14px 4px 14px;
+}
+
+.landing-float-chat p {
+  margin: 0 0 8px;
+  font-size: 0.75rem;
+  line-height: 1.45;
+}
+
+.landing-float-chat strong {
+  color: #fff;
+}
+
+.landing-float-chat button {
+  border: none;
+  border-radius: 999px;
+  background: var(--landing-blue);
+  color: #fff;
+  font-size: 0.72rem;
+  font-weight: 600;
+  padding: 5px 12px;
+  cursor: pointer;
+}
+
+/* ── Feature cards: encabezado con pose + tag (mockup UX) ──────────── */
+
+.landing-feature-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+/* Poses 3D de Pulso en las feature cards (assets/pulso-3d/). */
+.landing-feature-img {
+  width: 84px;
+  height: 84px;
+  object-fit: cover;
+  border-radius: 16px;
+  box-shadow: 0 4px 14px rgba(10, 31, 68, 0.1);
+}
+
+.landing-feature-head .landing-feature-tag {
+  margin: 4px 0 0;
+}
+
+/* Logo del AuthHeader clickeable cuando permite volver a la Landing. */
+.auth-header-logo--clickable {
+  cursor: pointer;
+}
+.auth-header-logo--clickable:hover {
+  opacity: 0.8;
+}
+
+/* ── Responsive ────────────────────────────────────────────────────── */
+
+@media (max-width: 720px) {
+  /* Header compacto en mobile, mismo criterio que .auth-header. */
+  .landing-header {
+    padding: 12px 16px;
+    gap: 8px;
+  }
+  .landing-header-actions {
+    gap: 8px;
+  }
+  .landing-btn {
+    padding: 8px 14px;
+    font-size: 12.5px;
+  }
+
+  .landing-hero {
+    padding-top: 32px;
+    padding-bottom: 32px;
+    gap: 24px;
+  }
+  .landing-hero-text h1 { font-size: 1.9rem; }
+
+  .landing-float-racha { left: 0; }
+  .landing-float-xp { right: 0; }
+  .landing-float-chat { right: 0; bottom: 10px; }
+
+  .landing-pulso-video { width: 240px; }
+
+  .landing-features {
+    padding-top: 24px;
+    padding-bottom: 40px;
+  }
+
+  .landing-cta {
+    padding: 24px 20px;
+    text-align: center;
+    flex-direction: column;
+  }
+}

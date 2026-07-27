@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import MentorBot, { MoodType } from '../components/MentorBot'
+import { apiChatPulso } from '../services/api'
 
 interface Message {
   from: 'user' | 'bot'
@@ -14,13 +15,6 @@ const getMood = (text: string): MoodType => {
   if (/ayuda|ayudame|no entiendo/i.test(text)) return 'ayudando'
   if (/triste|mal|difícil|no puedo/i.test(text)) return 'triste'
   return 'feliz'
-}
-
-const getBotResponse = (text: string): string => {
-  if (/recomiend/i.test(text)) return '¡Claro! Basándome en tus metas, te recomiendo empezar con algo concreto y alcanzable. ¿Querés crear una meta nueva?'
-  if (/concept/i.test(text)) return '¡Con gusto! Escribime el concepto que querés entender y lo explicamos juntos paso a paso.'
-  if (/desafío/i.test(text)) return '🏆 Los desafíos te ayudan a mantener el ritmo. ¡Mirá la sección Desafíos para ver los disponibles!'
-  return '¡Buena pregunta! Estoy acá para ayudarte. Podés también crear una meta nueva y te armo un plan personalizado. 💪'
 }
 
 // TODO: no existe endpoint de backend para historial de conversaciones (grupo `tutor`
@@ -60,13 +54,23 @@ export default function ChatPage() {
     setLoading(true)
     guardarReciente(text)
 
-    const mood = getMood(text)
-
-    // TODO: reemplazar por integración real con el tutor (POST /api/tutor/ask_step/)
-    await new Promise(r => setTimeout(r, 800))
-    const botMsg: Message = { from: 'bot', text: getBotResponse(text), mood }
-    setMessages(prev => [...prev, botMsg])
-    setLoading(false)
+    try {
+      const res = await apiChatPulso(text)
+      if (!res.ok) {
+        const detalle = res.data?.error || res.data?.detail || 'No se pudo generar la respuesta.'
+        setMessages(prev => [...prev, { from: 'bot', text: detalle, mood: 'triste' }])
+      } else {
+        setMessages(prev => [...prev, { from: 'bot', text: res.data.answer, mood: getMood(text) }])
+      }
+    } catch {
+      setMessages(prev => [...prev, {
+        from: 'bot',
+        text: 'No pude conectarme en este momento. Revisá tu conexión e intentá de nuevo.',
+        mood: 'triste',
+      }])
+    } finally {
+      setLoading(false)
+    }
   }
 
   return (

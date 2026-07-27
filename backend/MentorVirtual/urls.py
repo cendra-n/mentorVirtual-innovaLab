@@ -21,7 +21,7 @@ urlpatterns = [
     path('api/admin/',    include('adminpanel.urls')),
     path('api/tutor/',    include('tutor.urls')),
     path('api/courses/',    include('courses.urls')), #agregue courses
-    path('api/enrollment/', include('enrollment.urls')),#agregue inscripciones
+    path('api/enrollment/', include('enrollment.urls')), #inscripciones (Nadia)
 
     # Documentación
     path('api/schema/',            SpectacularAPIView.as_view(),                          name='schema'),

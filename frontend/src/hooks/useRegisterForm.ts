@@ -1,7 +1,6 @@
-import { useState } from 'react'
-import { apiRegister, apiUpdateStudentProfile, parseFieldErrors } from '../services/api'
+import { useState, useEffect } from 'react'
+import { apiRegister, apiUpdateStudentProfile, parseFieldErrors, apiGeoCountries, apiGeoProvinces } from '../services/api'
 import { getPasswordChecks, calcularEdad } from '../utils/authValidation'
-import { withEnglishFallback } from '../utils/studentProfileFields'
 
 export type Genero = 'F' | 'M' | 'ND'
 export type RegisterField = 'email' | 'username' | 'password' | 'confirm' | 'fechaNacimiento' | 'genero' | 'terminos'
@@ -22,6 +21,30 @@ export function useRegisterForm(onRegisterSuccess: (access: string, refresh: str
   const [fieldErrors, setFieldErrors] = useState<RegisterFieldErrors>({})
   const [generalError, setGeneralError] = useState('')
   const [loading, setLoading] = useState(false)
+
+  // País/provincia — opcionales, no bloquean el registro (Poly).
+  const [countries, setCountries] = useState<{ country_id: number; country_name: string }[]>([])
+  const [provinces, setProvinces] = useState<{ province_id: number; province_name: string }[]>([])
+  const [country, setCountry] = useState<number | ''>('')
+  const [province, setProvince] = useState<number | ''>('')
+  const [locality, setLocality] = useState<number | ''>('')
+  const [localityName, setLocalityName] = useState('')
+  const [geoLoading, setGeoLoading] = useState(false)
+
+  useEffect(() => {
+    apiGeoCountries().then(res => {
+      if (res.ok && Array.isArray(res.data)) setCountries(res.data)
+    }).catch(() => { /* opcional: si falla, el registro sigue sin país */ })
+  }, [])
+
+  useEffect(() => {
+    setLocality(''); setLocalityName('')
+    if (!country) { setProvinces([]); setProvince(''); return }
+    setGeoLoading(true)
+    apiGeoProvinces(country).then(res => {
+      if (res.ok && Array.isArray(res.data)) setProvinces(res.data)
+    }).catch(() => { }).finally(() => setGeoLoading(false))
+  }, [country])
 
   const validateField = (field: RegisterField): string | undefined => {
     switch (field) {
@@ -127,13 +150,17 @@ export function useRegisterForm(onRegisterSuccess: (access: string, refresh: str
       // lo normalizamos acá también para que lo que el usuario ve coincida
       // con lo que va a quedar guardado.
       const normalizedUsername = username.trim().toLowerCase()
-      const res = await apiRegister(normalizedUsername, normalizedEmail, password, confirm)
+      const res = await apiRegister(normalizedUsername, normalizedEmail, password, confirm, {
+        country: country || null,
+        province: province || null,
+        locality: locality || null,
+      })
       if (res.ok && res.data.access) {
         try {
-          await apiUpdateStudentProfile(res.data.access, withEnglishFallback({
-            fecha_nacimiento: fechaNacimiento,
-            genero,
-          }))
+          await apiUpdateStudentProfile(res.data.access, {
+            birth_date: fechaNacimiento,
+            user_gender: genero,
+          })
         } catch {
           // Si falla este segundo paso, no bloqueamos el acceso: la cuenta
           // ya se creó bien. La persona puede completar fecha/género después
@@ -181,5 +208,7 @@ export function useRegisterForm(onRegisterSuccess: (access: string, refresh: str
     isSubmitDisabled,
     handleSubmit,
     reset,
+    countries, provinces, country, setCountry, province, setProvince, geoLoading,
+    locality, localityName, setLocality, setLocalityName,
   }
 }

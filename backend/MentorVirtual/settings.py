@@ -48,6 +48,7 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+    'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
@@ -148,6 +149,16 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/6.0/howto/static-files/
 
 STATIC_URL = 'static/'
+STATIC_ROOT = BASE_DIR / 'staticfiles'
+
+STORAGES = {
+    "default": {
+        "BACKEND": "django.core.files.storage.FileSystemStorage",
+    },
+    "staticfiles": {
+        "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage",
+    },
+}
 
 # Configuración de Django REST Framework
 # Se definen las clases de autenticación y el esquema de generación de OpenAPI por defecto
@@ -225,7 +236,12 @@ MAX_COURSES_PER_PROFESSOR = int(os.environ.get("MAX_COURSES_PER_PROFESSOR", 2))
 AI_PROVIDER = os.environ.get('AI_PROVIDER', '')
 
 ANTHROPIC_API_KEY = os.environ.get('ANTHROPIC_API_KEY', '')
-ANTHROPIC_MODEL   = os.environ.get('ANTHROPIC_MODEL', 'claude-sonnet-4-6')
+ANTHROPIC_MODEL   = os.environ.get('ANTHROPIC_MODEL', 'claude-sonnet-5')
+
+# API pública de GeoRef (datos.gob.ar) — fuente de países/provincias/localidades
+# para el comando load_georef. Configurable por si cambia de versión/dominio,
+# o para apuntar a un mock en tests.
+GEOREF_API_BASE_URL = os.environ.get('GEOREF_API_BASE_URL', 'https://apis.datos.gob.ar/georef/api')
 
 OPENAI_API_KEY = os.environ.get('OPENAI_API_KEY', '')
 OPENAI_MODEL   = os.environ.get('OPENAI_MODEL', 'gpt-4o-mini')
@@ -247,3 +263,56 @@ GOALS_PLAN_MAX_TOKENS = int(os.environ.get('GOALS_PLAN_MAX_TOKENS', 2048))
 MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
 X_FRAME_OPTIONS = 'SAMEORIGIN'
+
+# ── Email (notificaciones de registro / inscripción) ───────────────────────────
+# Todos los valores salen de .env — nunca hardcodear credenciales acá.
+EMAIL_BACKEND = os.environ.get('EMAIL_BACKEND', 'django.core.mail.backends.console.EmailBackend')
+EMAIL_HOST = os.environ.get('EMAIL_HOST', 'smtp.gmail.com')
+EMAIL_PORT = int(os.environ.get('EMAIL_PORT', 587))
+EMAIL_USE_SSL = os.environ.get('EMAIL_USE_SSL', 'False') == 'True'
+EMAIL_USE_TLS = os.environ.get('EMAIL_USE_TLS', 'False') == 'True'
+EMAIL_HOST_USER = os.environ.get('EMAIL_HOST_USER', '')
+EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_HOST_PASSWORD', '')
+DEFAULT_FROM_EMAIL = os.environ.get('DEFAULT_FROM_EMAIL', EMAIL_HOST_USER)
+
+# ── Logging (consola + archivo de errores persistente) ─────────────────────────
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'formatters': {
+        'verbose': {
+            'format': '[{levelname}] {asctime} | {module}.{funcName} | {message}',
+            'style': '{',
+        },
+    },
+    'handlers': {
+        'file_errors': {
+            'level': 'ERROR',
+            'class': 'logging.FileHandler',
+            'filename': BASE_DIR / 'errors.log',
+            'formatter': 'verbose',
+        },
+        'console': {
+            'level': 'INFO',
+            'class': 'logging.StreamHandler',
+            'formatter': 'verbose',
+        },
+    },
+    'loggers': {
+        'django': {
+            'handlers': ['console', 'file_errors'],
+            'level': 'INFO',
+            'propagate': True,
+        },
+        'users': {
+            'handlers': ['console', 'file_errors'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+        'enrollment': {
+            'handlers': ['console', 'file_errors'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+    },
+}

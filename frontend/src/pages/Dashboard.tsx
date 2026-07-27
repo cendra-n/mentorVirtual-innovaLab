@@ -11,6 +11,7 @@ import AdminPanel from './AdminPanel'
 import Profile from './Profile'
 import TutorPage from './TutorPage'
 import ChatPage from './ChatPage'
+import Logros from './Logros'
 import {
   apiMe, apiGetGoals, apiCreateGoal, apiStreak, apiDeleteGoal
 } from '../services/api'
@@ -34,6 +35,13 @@ export default function Dashboard({ onLogout }: Props) {
     apiGetGoals().then(d => setGoals(d.goals || []))
     apiStreak().then(setStreak)
   }
+
+  // Solo refresca el user (avatar, país/provincia/localidad, etc.) — se pasa
+  // a Profile para que, al guardar cambios ahí adentro, el Sidebar (que tiene
+  // su propia copia de `user` recibida por prop) también se entere. Sin esto,
+  // el avatar/datos quedaban actualizados en la base pero el resto de la UI
+  // seguía mostrando la foto/datos viejos hasta el próximo F5.
+  const refreshUser = () => { apiMe().then(setUser) }
 
   useEffect(() => { loadData() }, [])
 
@@ -60,11 +68,14 @@ export default function Dashboard({ onLogout }: Props) {
   const canDelete = userRole === 'ADMIN' || userRole === 'PROFESSOR' || user?.is_staff
 
   const displayName = user?.first_name || user?.username || 'Brenda'
+  const [headerAvatarError, setHeaderAvatarError] = useState(false)
+
+  useEffect(() => { setHeaderAvatarError(false) }, [user?.avatar_url])
 
   // Vista admin
   if (showAdmin) {
     return (
-      <div className={`dashboard ${activePage === 'chat' ? 'dashboard--chat-full' : ''}`}>
+      <div className={`dashboard dashboard--admin ${activePage === 'chat' ? 'dashboard--chat-full' : ''}`}>
         <Sidebar
           active="admin"
           onNav={(p) => { setShowAdmin(false); setActivePage(p) }}
@@ -74,10 +85,6 @@ export default function Dashboard({ onLogout }: Props) {
           onAdmin={() => setShowAdmin(true)}
         />
         <AdminPanel onBack={() => setShowAdmin(false)} />
-        <div className="dashboard-right">
-          <WeekStreak currentStreak={streak.current_streak} longestStreak={streak.longest_streak} lastActivity={streak.last_activity} />
-          <MentorChat />
-        </div>
         <MobileNav active={activePage} onNav={(p) => { setShowAdmin(false); setActivePage(p) }} />
       </div>
     )
@@ -113,7 +120,7 @@ export default function Dashboard({ onLogout }: Props) {
   }
 
   return (
-    <div className="dashboard">
+    <div className={`dashboard ${activePage === 'chat' || activePage === 'perfil' ? 'dashboard--chat-full' : ''}`}>
       <Sidebar
         active={activePage}
         onNav={setActivePage}
@@ -124,10 +131,11 @@ export default function Dashboard({ onLogout }: Props) {
       />
 
       <main className="dashboard-main">
-        {activePage === 'perfil' && <Profile user={user} onLogout={onLogout} />}
+        {activePage === 'perfil' && <Profile user={user} onLogout={onLogout} onUserUpdated={refreshUser} />}
         {activePage === 'lecciones' && <TutorPage />}
         {activePage === 'chat' && <ChatPage />}
-        {activePage !== 'perfil' && activePage !== 'lecciones' && activePage !== 'chat' && <>
+        {activePage === 'logros' && <Logros />}
+        {activePage !== 'perfil' && activePage !== 'lecciones' && activePage !== 'chat' && activePage !== 'logros' && <>
           <header className="dash-header">
             <div>
               <h1 className="dash-greeting">¡Hola {displayName}! 👋</h1>
@@ -135,7 +143,18 @@ export default function Dashboard({ onLogout }: Props) {
             </div>
             <div className="dash-header-right">
               <button className="icon-btn">🔔</button>
-              <div className="avatar-circle">{displayName.charAt(0).toUpperCase()}</div>
+              <div className="avatar-circle">
+                {user?.avatar_url && !headerAvatarError ? (
+                  <img
+                    src={user.avatar_url}
+                    alt={displayName}
+                    className="avatar-circle-img"
+                    onError={() => setHeaderAvatarError(true)}
+                  />
+                ) : (
+                  displayName.charAt(0).toUpperCase()
+                )}
+              </div>
             </div>
           </header>
 
@@ -183,7 +202,7 @@ export default function Dashboard({ onLogout }: Props) {
           )}
         </>}</main>
 
-      {activePage !== 'chat' && (
+      {activePage !== 'chat' && activePage !== 'perfil' && (
         <div className="dashboard-right">
           <WeekStreak
             currentStreak={streak.current_streak}
@@ -202,7 +221,7 @@ export default function Dashboard({ onLogout }: Props) {
         />
       )}
 
-      {activePage !== 'perfil' && activePage !== 'lecciones' && activePage !== 'chat' && (
+      {activePage !== 'perfil' && activePage !== 'lecciones' && activePage !== 'chat' && activePage !== 'logros' && (
         <button className="mobile-fab-cta" onClick={() => setShowModal(true)}>
           {goals.length > 0 ? '🤖 Nueva meta' : '✨ Crear mi primer plan'}
         </button>

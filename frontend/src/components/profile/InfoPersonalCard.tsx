@@ -1,8 +1,10 @@
 import { useState, useEffect } from 'react'
-import { withEnglishFallback, readField } from '../../utils/studentProfileFields'
+import { apiGeoCountries, apiGeoProvinces, apiUpdateProfile } from '../../services/api'
+import GeoLocalityAutocomplete from '../GeoLocalityAutocomplete'
 
 interface Props {
   user: any
+  onUserUpdated?: () => void
 }
 
 const BASE = '/api'
@@ -16,7 +18,7 @@ const headers = () => ({
  * Incluye edición de datos básicos, avatar, y hace su propio fetch
  * del perfil de estudiante (para la fecha de nacimiento).
  */
-export default function InfoPersonalCard({ user }: Props) {
+export default function InfoPersonalCard({ user, onUserUpdated }: Props) {
   const [editMode, setEditMode] = useState(false)
   const [editEmail, setEditEmail] = useState(user?.email || '')
   const [editPhone, setEditPhone] = useState(user?.phone || '')
@@ -28,31 +30,58 @@ export default function InfoPersonalCard({ user }: Props) {
   const [avatarEdit, setAvatarEdit] = useState(false)
   const [avatarMsg, setAvatarMsg] = useState('')
 
+  // País/provincia/localidad de residencia (Poly) — opcionales, mismo criterio que en Registro.
+  const [countries, setCountries] = useState<{ country_id: number; country_name: string }[]>([])
+  const [provinces, setProvinces] = useState<{ province_id: number; province_name: string }[]>([])
+  const [editCountry, setEditCountry] = useState<number | ''>('')
+  const [editProvince, setEditProvince] = useState<number | ''>('')
+  const [editLocality, setEditLocality] = useState<number | ''>('')
+  const [editLocalityName, setEditLocalityName] = useState('')
+  const [geoLoading, setGeoLoading] = useState(false)
+
   const displayName = user?.first_name || user?.username || '...'
 
   useEffect(() => {
-    fetch(`${BASE}/auth/profile/student/update/`, { headers: headers() })
-      .then(r => r.json())
-      .then(data => setEditFechaNac(readField(data, 'fecha_nacimiento') || ''))
-      .catch(() => { })
+    setEditFechaNac(user?.birth_date || '')
+    setEditCountry(user?.country_residence?.country_id || '')
+    setEditProvince(user?.province_residence?.province_id || '')
+    setEditLocality(user?.locality_residence?.locality_id || '')
+    setEditLocalityName(user?.locality_residence?.locality_name || '')
+  }, [user])
+
+  useEffect(() => {
+    apiGeoCountries().then(res => {
+      if (res.ok && Array.isArray(res.data)) setCountries(res.data)
+    }).catch(() => { })
   }, [])
+
+  useEffect(() => {
+    if (!editCountry) { setProvinces([]); return }
+    setGeoLoading(true)
+    apiGeoProvinces(editCountry).then(res => {
+      if (res.ok && Array.isArray(res.data)) setProvinces(res.data)
+    }).catch(() => { }).finally(() => setGeoLoading(false))
+  }, [editCountry])
 
   const handleSaveProfile = async () => {
     setProfileMsg('')
     setSavingProfile(true)
     try {
-      await fetch(`${BASE}/auth/me/`, {
-        method: 'PATCH',
-        headers: headers(),
-        body: JSON.stringify({ email: editEmail, phone: editPhone }),
+      await apiUpdateProfile({
+        email: editEmail,
+        phone: editPhone,
+        ...(editCountry  ? { country: editCountry }   : { country: null }),
+        ...(editProvince ? { province: editProvince } : { province: null }),
+        ...(editLocality ? { locality: editLocality } : { locality: null }),
       })
       await fetch(`${BASE}/auth/profile/student/update/`, {
         method: 'PATCH',
         headers: headers(),
-        body: JSON.stringify(withEnglishFallback({ fecha_nacimiento: editFechaNac })),
+        body: JSON.stringify({ birth_date: editFechaNac }),
       })
       setProfileMsg('✅ Perfil actualizado.')
       setEditMode(false)
+      onUserUpdated?.()
     } catch {
       setProfileMsg('❌ No se pudo guardar. Intentá de nuevo.')
     }
@@ -125,6 +154,7 @@ export default function InfoPersonalCard({ user }: Props) {
                   if (res.user || res.avatar_url) {
                     setAvatarMsg('✅ Foto actualizada.')
                     setAvatarEdit(false)
+                    onUserUpdated?.()
                   } else {
                     setAvatarMsg('❌ No se pudo guardar.')
                   }
@@ -173,6 +203,46 @@ export default function InfoPersonalCard({ user }: Props) {
             onChange={e => setEditPhone(e.target.value)}
             disabled={!editMode}
             placeholder="—"
+          />
+        </div>
+        <div className="profile-field">
+          <label>País</label>
+          <select
+            className="form-input"
+            value={editCountry}
+            onChange={e => { setEditCountry(e.target.value ? Number(e.target.value) : ''); setEditProvince(''); setEditLocality(''); setEditLocalityName('') }}
+            disabled={!editMode}
+          >
+            <option value="">Sin especificar</option>
+            {countries.map(c => (
+              <option key={c.country_id} value={c.country_id}>{c.country_name}</option>
+            ))}
+          </select>
+        </div>
+        <div className="profile-field">
+          <label>Provincia</label>
+          <select
+            className="form-input"
+            value={editProvince}
+            onChange={e => { setEditProvince(e.target.value ? Number(e.target.value) : ''); setEditLocality(''); setEditLocalityName('') }}
+            disabled={!editMode || !editCountry || geoLoading}
+          >
+            <option value="">{geoLoading ? 'Cargando...' : 'Sin especificar'}</option>
+            {provinces.map(p => (
+              <option key={p.province_id} value={p.province_id}>{p.province_name}</option>
+            ))}
+          </select>
+        </div>
+        <div className="profile-field">
+          <label>Localidad</label>
+          <GeoLocalityAutocomplete
+            provinceId={editProvince}
+            value={editLocality}
+            valueName={editLocalityName}
+            onChange={(id, name) => { setEditLocality(id); setEditLocalityName(name) }}
+            disabled={!editMode || !editProvince}
+            className="form-input"
+            placeholder={!editMode ? '—' : (!editProvince ? 'Elegí una provincia primero' : 'Escribí para buscar...')}
           />
         </div>
       </div>

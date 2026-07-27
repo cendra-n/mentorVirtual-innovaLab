@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useGoals } from '../../hooks/useGoals'
 import { useLogros } from '../../hooks/useLogros'
-import { readField } from '../../utils/studentProfileFields'
 
 const BASE = '/api'
 const headers = () => ({
@@ -23,7 +22,7 @@ export default function ResumenActividadCard() {
   useEffect(() => {
     fetch(`${BASE}/auth/profile/student/update/`, { headers: headers() })
       .then(r => r.json())
-      .then(data => setVideosVistos(readField(data, 'cantidad_videos_vistos') ?? 0))
+      .then(data => setVideosVistos(data?.watched_videos_count ?? 0))
       .catch(() => { })
   }, [])
 

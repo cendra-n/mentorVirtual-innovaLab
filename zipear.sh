@@ -1,0 +1,11 @@
+zip -r develop_$(date +%Y%m%d).zip . \
+  -x "node_modules/*" \
+  -x "*/node_modules/*" \
+  -x ".git/*" \
+  -x "**/__pycache__/*" \
+  -x "*.pyc" \
+  -x "frontend/dist/*" \
+  -x "backend/media/*" \
+  -x "backend/staticfiles/*" \
+  -x "*.sqlite3" \
+  -x ".env"

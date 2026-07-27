@@ -158,3 +158,5 @@ __pycache__/
 *.pyo
 .env
 *.sqlite3
+git-helper.sh
+zipear.sh

@@ -36,7 +36,7 @@ export default function OnboardingLayout({
           <div className="auth-header-logo-icon">
             <LogoIcon />
           </div>
-          <span>Impulsa</span>
+          <span>{import.meta.env.VITE_APP_NAME || 'Impulsa'}</span>
         </div>
         <span className="onboarding-paso-label">Paso {paso}/{total}</span>
       </header>

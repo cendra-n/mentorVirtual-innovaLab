@@ -11,6 +11,7 @@ import CerrarSesionCard from '../components/profile/CerrarSesionCard'
 interface Props {
   user: any
   onLogout: () => void
+  onUserUpdated?: () => void
 }
 
 /**
@@ -18,7 +19,7 @@ interface Props {
  * dentro de components/profile/, para que distintas personas puedan
  * trabajar en tarjetas distintas sin generar conflictos de merge.
  */
-export default function Profile({ user, onLogout }: Props) {
+export default function Profile({ user, onLogout, onUserUpdated }: Props) {
   return (
     <div className="profile-page profile-page--nuevo">
       <div className="profile-header">
@@ -28,7 +29,7 @@ export default function Profile({ user, onLogout }: Props) {
       <div className="profile-layout">
         {/* ══ Columna principal ══ */}
         <div className="profile-main-col">
-          <InfoPersonalCard user={user} />
+          <InfoPersonalCard user={user} onUserUpdated={onUserUpdated} />
           <NotificacionesCard />
           <SeguridadCard />
           <LogrosCard />

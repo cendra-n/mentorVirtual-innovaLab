@@ -1,9 +1,45 @@
 from rest_framework import serializers
 from django.contrib.auth.models import User
 from django.core.validators import RegexValidator
-from .models import UserProfile, UserConfig, StudentProfile
+from .models import UserProfile, UserConfig, StudentProfile, EventTypes, UserActivityLog, Country, Province, Locality, Nationality
 import re
 from datetime import date
+
+
+class NationalitySerializer(serializers.Serializer):
+    nationality_id = serializers.IntegerField()
+    nationality_name = serializers.CharField()
+    class Meta:
+        fields = ['nationality_id', 'nationality_name']
+
+class CountrySerializer(serializers.Serializer):
+    country_id = serializers.IntegerField()
+    country_name = serializers.CharField()
+
+    class Meta:
+        fields = ['country_id', 'country_name']
+
+class ProvinceSerializer(serializers.Serializer):
+    province_id = serializers.IntegerField()
+    province_name = serializers.CharField()
+    country = CountrySerializer()
+
+    class Meta:
+        fields = ['province_id', 'province_name', 'country']
+
+class ProvinceSearchSerializer(serializers.Serializer):
+    province_name = serializers.CharField(
+        max_length=100,
+        help_text="Escribe el nombre de la provincia a buscar (ej: Mendoza, Córdoba, Neuquén)"
+        )
+
+class LocalitySerializer(serializers.Serializer):
+    locality_id = serializers.IntegerField()
+    locality_name = serializers.CharField()
+    province = ProvinceSerializer()
+
+    class Meta:
+        fields = ['locality_id', 'locality_name', 'province']
 
 
 class UserConfigSerializer(serializers.ModelSerializer):
@@ -17,10 +53,36 @@ class UserDetailSerializer(serializers.ModelSerializer):
     avatar_url = serializers.SerializerMethodField()
     role       = serializers.SerializerMethodField()
     config     = serializers.SerializerMethodField()
+    session_status = serializers.SerializerMethodField()
+    country_residence  = serializers.SerializerMethodField()
+    province_residence = serializers.SerializerMethodField()
+    locality_residence = serializers.SerializerMethodField()
 
     class Meta:
         model  = User
-        fields = ['id', 'username', 'email', 'role', 'phone', 'avatar_url', 'config']
+        fields = [
+            'id', 'username', 'email', 'role',
+            'phone', 'avatar_url', 'config', 'session_status',
+            'country_residence', 'province_residence', 'locality_residence'
+        ]
+
+    def get_country_residence(self, obj):
+        if hasattr(obj, 'profile') and obj.profile.country_residence:
+            return CountrySerializer(obj.profile.country_residence).data
+        return None
+
+    def get_province_residence(self, obj):
+        if hasattr(obj, 'profile') and obj.profile.province_residence:
+            return ProvinceSerializer(obj.profile.province_residence).data
+        return None
+
+    def get_locality_residence(self, obj):
+        if hasattr(obj, 'profile') and obj.profile.locality_residence:
+            return LocalitySerializer(obj.profile.locality_residence).data
+        return None
+
+    def get_session_status(self, obj):
+        return getattr(obj.profile, 'session_status', 'OFFLINE') if hasattr(obj, 'profile') else 'OFFLINE'
 
     def get_phone(self, obj):
         return getattr(obj.profile, 'phone', '') if hasattr(obj, 'profile') else ''
@@ -131,6 +193,18 @@ class RegisterRequestSerializer(serializers.Serializer):
         required=False, allow_blank=True, default='',
         help_text="URL de avatar (opcional)."
     )
+    country = serializers.PrimaryKeyRelatedField(
+        queryset=Country.objects.all(), required=False, allow_null=True,
+        help_text="ID del país de residencia (opcional, ver GET /api/auth/geo/countries/)."
+    )
+    province = serializers.PrimaryKeyRelatedField(
+        queryset=Province.objects.all(), required=False, allow_null=True,
+        help_text="ID de la provincia de residencia (opcional, ver GET /api/auth/geo/provinces/list?country=<id>)."
+    )
+    locality = serializers.PrimaryKeyRelatedField(
+        queryset=Locality.objects.all(), required=False, allow_null=True,
+        help_text="ID de la localidad de residencia (opcional, ver GET /api/auth/geo/localities/?province=<id>)."
+    )
     font_size = serializers.ChoiceField(
         choices=['SMALL', 'MEDIUM', 'LARGE'], required=False, default='MEDIUM',
         error_messages={'invalid_choice': 'El tamaño de fuente seleccionado no es válido. Las opciones permitidas son: SMALL, MEDIUM, LARGE.'},
@@ -190,6 +264,20 @@ class RegisterRequestSerializer(serializers.Serializer):
                     'username': ['El nombre de usuario ya está registrado.']
                 })
 
+        # Coherencia jerárquica de geo (opcional): si mandan más de un nivel,
+        # tienen que encajar entre sí. Mismo criterio que ProfileUpdateSerializer.
+        country  = data.get('country')
+        province = data.get('province')
+        locality = data.get('locality')
+        if province and country and province.country_id != country.country_id:
+            raise serializers.ValidationError({
+                'province': [f'La provincia seleccionada no pertenece a {country.country_name}.']
+            })
+        if locality and province and locality.province_id != province.province_id:
+            raise serializers.ValidationError({
+                'locality': [f'La localidad seleccionada no pertenece a {province.province_name}.']
+            })
+
         return data
 
 
@@ -201,6 +289,18 @@ class RegisterResponseSerializer(serializers.Serializer):
 
 
 class ProfileUpdateSerializer(serializers.Serializer):
+    country = serializers.PrimaryKeyRelatedField(
+        queryset=Country.objects.all(), required=False, allow_null=True,
+        help_text="ID del país de residencia (ver GET /api/auth/geo/countries/)."
+    )
+    province = serializers.PrimaryKeyRelatedField(
+        queryset=Province.objects.all(), required=False, allow_null=True,
+        help_text="ID de la provincia de residencia (ver GET /api/auth/geo/provinces/list?country=<id>)."
+    )
+    locality = serializers.PrimaryKeyRelatedField(
+        queryset=Locality.objects.all(), required=False, allow_null=True,
+        help_text="ID de la localidad de residencia."
+    )
     email = serializers.EmailField(
         required=False,
         help_text="Nuevo email (debe ser único)."
@@ -237,6 +337,21 @@ class ProfileUpdateSerializer(serializers.Serializer):
                 )
         return value
 
+    def validate(self, data):
+        country  = data.get('country')
+        province = data.get('province')
+        locality = data.get('locality')
+
+        if province and country and province.country_id != country.country_id:
+            raise serializers.ValidationError({
+                'province': f'La provincia seleccionada no pertenece a {country.country_name}.'
+            })
+        if locality and province and locality.province_id != province.province_id:
+            raise serializers.ValidationError({
+                'locality': f'La localidad seleccionada no pertenece a {province.province_name}.'
+            })
+        return data
+
 
 class ProfileUpdateResponseSerializer(serializers.Serializer):
     message = serializers.CharField()
@@ -255,76 +370,76 @@ class StudentProfileSerializer(serializers.ModelSerializer):
         # Se excluye el 'user' porque ya viene del contexto del token (request.user)
         exclude = ['user']
         extra_kwargs = {
-            'fecha_nacimiento': {
+            'birth_date': {
                 'label': 'Fecha de nacimiento',
                 'help_text': 'Fecha de nacimiento en formato YYYY-MM-DD.',
                 'required': False
             },
-            'nivel_educativo': {
+            'education_level': {
                 'label': 'Nivel Educativo',
                 'help_text': 'Nivel educativo alcanzado (ej: primario_completo, secundario_completo).',
                 'required': False
             },
-            'estado_laboral': {
+            'employment_status': {
                 'label': 'Estado laboral',
                 'help_text': 'Situación laboral actual (activo, desempleado).',
                 'required': False
             },
-            'intereses': {
+            'user_interests': {
                 'label': 'Intereses',
                 'help_text': 'Lista de intereses como arreglo de strings, ej: ["Programación", "Diseño"].',
                 'required': False
             },
-            'genero': {
+            'user_gender': {
                 'label': 'Género',
                 'help_text': 'Género (M, F, NB, ND).',
                 'required': False
             },
-            'objetivo_principal': {
+            'primary_objective': {
                 'label': 'Objetivo principal',
                 'help_text': 'Motivación principal para usar la app (empleo, personal, estudios, hobby).',
                 'required': False
             },
-            'disponibilidad_tiempo': {
+            'time_availability': {
                 'label': 'Disponibilidad de tiempo',
                 'help_text': 'Tiempo estimado disponible semanalmente (baja, media, alta).',
                 'required': False
             },
-            'zona_horaria': {
+            'time_zone': {
                 'label': 'Zona horaria',
             },
-            'frecuencia_entradas': {
+            'entry_frequency': {
                 'read_only': True,
                 'min_value': 0,
                 'max_value': 10000
             },
-            'racha_actual_dias': {
+            'current_streak_days': {
                 'read_only': True,
                 'min_value': 0,
                 'max_value': 3650
             },
-            'racha_maxima_dias': {
+            'max_streak_days': {
                 'read_only': True,
                 'min_value': 0,
                 'max_value': 3650
             },
-            'tiempo_acumulado_app_minutos': {
+            'app_time_min': {
                 'read_only': True,
                 'min_value': 0.0
             },
-            'tiempo_interaccion_mentor_minutos': {
+            'mentor_interaction_time_min': {
                 'read_only': True,
                 'min_value': 0.0
             },
-            'cantidad_videos_vistos': {
+            'watched_videos_count': {
                 'read_only': True,
                 'min_value': 0
             },
-            'tiempo_api_youtube_minutos': {
+            'youtube_api_time_min': {
                 'read_only': True,
                 'min_value': 0.0
             },
-            'desafios_completados': {
+            'completed_challenges': {
                 'read_only': True,
                 'min_value': 0
             },
